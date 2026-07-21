@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Sign in — OSH-C Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <h1>OSH-C Portal</h1>
+    <p class="sub">Asbenz Motors · Workshop Safety Compliance</p>
+
+    <div class="login-error" id="loginError"></div>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Login ID (email)</label>
+        <input type="email" id="email" autocomplete="username" required placeholder="you@asbenzmotors.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required placeholder="••••••••" />
+      </div>
+      <button type="submit" class="btn primary block" id="loginBtn">Sign in</button>
+    </form>
+    <p class="text-dim mt-8" style="font-size:11.5px;">
+      Access is by invitation only. Contact your administrator if you don't have a login.
+    </p>
+  </div>
+</div>
+
+<!-- New password modal, shown when server flags forcePasswordReset -->
+<div class="overlay" id="resetOverlay">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head"><h2>Set a new password</h2></div>
+    <p class="text-dim" style="font-size:13px;margin-top:-8px;">Your account requires a password change before continuing.</p>
+    <div class="login-error" id="resetError"></div>
+    <form id="resetForm">
+      <div class="field">
+        <label>Current (temporary) password</label>
+        <input type="password" id="rCurrent" required />
+      </div>
+      <div class="field">
+        <label>New password (min 8 characters)</label>
+        <input type="password" id="rNew" minlength="8" required />
+      </div>
+      <div class="field">
+        <label>Confirm new password</label>
+        <input type="password" id="rConfirm" minlength="8" required />
+      </div>
+      <button class="btn primary block" type="submit">Save &amp; continue</button>
+    </form>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script>
+let pendingUser = null, pendingToken = null;
+
+document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const errEl = document.getElementById("loginError");
+  const btn = document.getElementById("loginBtn");
+  errEl.classList.remove("show");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Signing in…';
+  try {
+    const data = await api("/auth/login", { method: "POST", body: { email, password } });
+    if (data.user.forcePasswordReset) {
+      pendingUser = data.user;
+      pendingToken = data.token;
+      localStorage.setItem("osh_token", data.token);
+      localStorage.setItem("osh_user", JSON.stringify(data.user));
+      document.getElementById("resetOverlay").classList.add("open");
+    } else {
+      Auth.setSession(data.token, data.user);
+      window.location.href = data.user.role === "Admin" ? "/index.html" : "/index.html";
+    }
+  } catch (err) {
+    errEl.textContent = err.message || "Sign in failed.";
+    errEl.classList.add("show");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign in";
+  }
+});
+
+document.getElementById("resetForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const currentPassword = document.getElementById("rCurrent").value;
+  const newPassword = document.getElementById("rNew").value;
+  const confirm = document.getElementById("rConfirm").value;
+  const errEl = document.getElementById("resetError");
+  errEl.classList.remove("show");
+  if (newPassword !== confirm) {
+    errEl.textContent = "New passwords don't match.";
+    errEl.classList.add("show");
+    return;
+  }
+  try {
+    await api("/auth/change-password", { method: "POST", body: { currentPassword, newPassword } });
+    toast("Password updated. Redirecting…");
+    setTimeout(() => (window.location.href = "/index.html"), 700);
+  } catch (err) {
+    errEl.textContent = err.message || "Could not update password.";
+    errEl.classList.add("show");
+  }
+});
+
+// Already signed in? skip straight to the dashboard.
+if (Auth.token()) window.location.href = "/index.html";
+</script>
+</body>
+</html>

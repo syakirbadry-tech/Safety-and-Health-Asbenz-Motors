@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Admin — OSH-C Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/index.html">
+      <div class="logo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+      <div>
+        <h1>OSH-C Portal</h1>
+        <div class="sub">Asbenz Motors</div>
+      </div>
+    </a>
+    <nav class="side-nav">
+      <a href="/index.html">Dashboard</a>
+      <a href="/admin.html" class="active">Admin</a>
+    </nav>
+    <div class="side-footer">
+      <div class="row">
+        <div class="avatar" id="avatarInitials">--</div>
+        <div class="who">
+          <div class="pname" id="profileName">—</div>
+          <div class="prole">Admin</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="page">
+      <div class="page-head" style="padding-bottom:14px;">
+        <div class="eyebrow">OSH-C Portal · Asbenz Motors</div>
+        <h1 style="font-size:24px;">Admin</h1>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="data">Data Browser</div>
+        <div class="tab" data-tab="users">Users &amp; Roles</div>
+        <div class="tab" data-tab="activity">Login &amp; Activity History</div>
+        <div class="tab" data-tab="settings">Settings</div>
+      </div>
+
+      <div id="tabData">
+        <p class="text-dim" style="font-size:12px;margin:-6px 0 16px;">
+          Every field, every record, editable directly — like phpMyAdmin, but for your OSH-C data.
+          Click any cell to edit; it saves when you click away. Changes go straight to Airtable and
+          are logged in Activity History.
+        </p>
+        <div class="data-layout">
+          <div class="data-sidebar" id="dataSidebar"></div>
+          <div class="data-main">
+            <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h2 id="dataModuleTitle" style="font-size:16px;margin:0;">—</h2>
+              <button class="btn primary small" id="addRowBtn">+ Add row</button>
+            </div>
+            <div class="table-wrap">
+              <table id="dataTable">
+                <thead><tr id="dataTableHead"></tr></thead>
+                <tbody id="dataTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabUsers" class="hidden">
+        <div class="flex" style="justify-content:flex-end;margin-bottom:14px;">
+          <button class="btn primary small" id="newUserBtn">+ New user</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Login ID</th><th>Role</th><th>Status</th><th>Last Login</th><th>Force Reset</th><th></th></tr></thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tabActivity" class="hidden">
+        <div class="field" style="max-width:280px;">
+          <label>Filter by action</label>
+          <select id="activityFilter">
+            <option value="">All actions</option>
+            <option>Error</option>
+            <option>Login Success</option>
+            <option>Login Failed</option>
+            <option>Logout</option>
+            <option>Create</option>
+            <option>Update</option>
+            <option>Delete</option>
+            <option>Upload</option>
+            <option>Password Reset</option>
+            <option>Admin Change</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th><th>Reference</th><th>Details</th></tr></thead>
+            <tbody id="activityBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tabSettings" class="hidden">
+        <div class="section-head" style="margin-top:0;"><h2>System health</h2><span class="hint" id="healthCheckedAt"></span></div>
+        <div class="stats" id="healthGrid" style="margin-bottom:30px;"></div>
+
+        <div class="section-head"><h2>Data — backup &amp; bulk overwrite</h2><span class="hint">Per module, admin only</span></div>
+        <div class="table-wrap" style="margin-bottom:30px;">
+          <table>
+            <thead><tr><th>Module</th><th>Records</th><th></th></tr></thead>
+            <tbody id="dataToolsBody"></tbody>
+          </table>
+        </div>
+
+        <p class="text-dim" style="font-size:12px;max-width:640px;">
+          "Export" downloads every record in that module as JSON (a safe backup, and the format
+          "Bulk import" expects). "Bulk import" can either add new records ("append") or wipe the
+          table and replace it entirely ("overwrite") — overwrite cannot be undone, always export
+          a backup first. For quick one-off edits, use the Data Browser tab instead.
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head"><h2 id="modalTitle">—</h2><button class="modal-close" id="modalClose">✕</button></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/modules.config.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>
