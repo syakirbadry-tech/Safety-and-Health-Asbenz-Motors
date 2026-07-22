@@ -31,14 +31,72 @@ const CHEMICAL_MODULE = defineBusinessModule({
   ],
 
   generalInfoFields: [
-    "Chemical Name", "CAS Number", "Supplier", "Storage Location",
-    "Hazard Classification", "Quantity", "PPE Requirement", "Exposure Limit", "Notes",
+    "Chemical Name", "CAS Number", "Supplier", "Storage Location", "Department", "Responsible Person",
+    "Hazard Classification", "Quantity", "Unit", "Internal Code", "Review Frequency", "Status",
+    "PPE Requirement", "Exposure Limit", "Process", "No. of Workers Exposed", "Type of Use",
+    "Control Measures", "PPE Actually Used", "Notes", "Internal Remarks",
   ],
   headerSubtitleFields: ["Storage Location", "CAS Number"],
 
-  dashboardSubTabOrder: ["exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement"],
+  dashboardSubTabOrder: ["sdsDocuments", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
 
   subTables: {
+    sdsDocuments: {
+      title: "SDS Documents",
+      api: "/sds-documents",
+      primary: "sdsReference",
+      parentFieldKey: "chemical",
+      fields: {
+        sdsReference: "fldpZnhslt5PqdlKg",
+        chemical: "fldyGInJFgYuE3saX",
+        productName: "fldy23Kb0e4djksKw",
+        manufacturer: "fldKR0rdUCpCTyXPG",
+        supplier: "fldY3vP72k5IrtH11",
+        casNumber: "fldCaBwYY8BfUxF6r",
+        ecNumber: "fldLD2DGd7rJFeEwf",
+        revisionDate: "fldnO87F7rLnYwHQu",
+        sdsVersion: "fldjKv9JfyAcEh5cc",
+        hazardClassification: "fldmLs0UIluUGBeDp",
+        signalWord: "fldVUJBvqw5FohTrK",
+        hStatements: "fldrJNZvYJkS135q7",
+        pStatements: "fldQY5F29ugmnjSkN",
+        physicalForm: "fld5Cn2bs4lQhFENy",
+        firstAid: "fldn1RU1E047VYAGr",
+        fireFighting: "fldjANWsHBVx2JtMp",
+        ppeRecommended: "fldzDwKgx3g6L9y8H",
+        storageRequirements: "fldMmGhwFF0gZgMC3",
+        disposalRequirements: "fldkeYOXId8lI9QWn",
+        exposureLimits: "fldoXO8cTLKrtg2Gu",
+        unNumber: "fldu7MPCeSY0C3ncJ",
+        transportInformation: "fldGd9JcfTbkS3fGv",
+        language: "fldo23mELm8KCBYR8",
+        status: "fldE1wYIm1mVc8oEG",
+        notes: "fldqoLMtuiHqYNs8x",
+        file: "fldwdrQQpzpboQZta",
+      },
+      // GHS Pictograms (multipleSelects) isn't listed here — the generic
+      // sub-record form only handles single-value fields; pictograms are
+      // set by the Add Chemical wizard and viewable/editable directly in
+      // Airtable if ever needed. Every other field is fully editable here.
+      formMeta: {
+        labels: {
+          sdsReference: "SDS Reference", productName: "Product Name", manufacturer: "Manufacturer", supplier: "Supplier",
+          casNumber: "CAS Number", ecNumber: "EC Number", revisionDate: "Revision Date", sdsVersion: "SDS Version",
+          hazardClassification: "Hazard Classification", signalWord: "Signal Word", hStatements: "H Statements",
+          pStatements: "P Statements", physicalForm: "Physical Form", firstAid: "First Aid", fireFighting: "Fire Fighting",
+          ppeRecommended: "PPE Recommended", storageRequirements: "Storage Requirements", disposalRequirements: "Disposal Requirements",
+          exposureLimits: "Exposure Limits", unNumber: "UN Number", transportInformation: "Transport Information",
+          language: "Language", status: "Status", notes: "Notes",
+        },
+        dateKeys: ["revisionDate"],
+        selectOptions: { signalWord: ["Danger", "Warning", "None"], language: ["English", "Bahasa Malaysia", "Other"], status: ["Current", "Superseded"] },
+        textareaKeys: ["hazardClassification", "hStatements", "pStatements", "firstAid", "fireFighting", "ppeRecommended", "storageRequirements", "disposalRequirements", "exposureLimits", "transportInformation", "notes"],
+        attachmentKey: "file",
+        attachmentLabel: "SDS File",
+      },
+      listColumns: ["revisionDate", "language", "status"],
+      countLabel: "SDS Revisions on File",
+    },
     exposureMonitoring: {
       title: "Exposure Monitoring",
       api: "/exposure-monitoring",
@@ -149,15 +207,48 @@ const CHEMICAL_MODULE = defineBusinessModule({
       listColumns: ["wasteType", "disposalDate"],
       countLabel: "Waste Disposals Logged",
     },
+    training: {
+      title: "Chemical Safety Training",
+      api: "/chemical-safety-training",
+      primary: "trainingReference",
+      parentFieldKey: "chemical",
+      fields: {
+        trainingReference: "fld0qAaTzP5WJZeG6",
+        chemical: "fld2pvGHCNd5j77Jz",
+        trainingDate: "fldHLKOnkgD2xlTcC",
+        trainer: "fldGDed2yDtMpexVb",
+        topic: "fldcdr0A87rFXznE9",
+        attendees: "fld97FzXcvjP63Z5r",
+        numberOfAttendees: "fldV8NT9JKf927yZP",
+        nextDue: "fldOZ4JLKfKtvMFd4",
+        status: "fld5A5OlvcLtzoSsM",
+        attachment: "fldPgXr48JmBolBMz",
+      },
+      formMeta: {
+        labels: { trainingReference: "Training Reference", trainingDate: "Training Date", trainer: "Trainer", topic: "Topic", attendees: "Attendees", numberOfAttendees: "Number of Attendees", nextDue: "Next Due", status: "Status" },
+        dateKeys: ["trainingDate", "nextDue"],
+        selectOptions: { status: ["Completed", "Scheduled", "Overdue"] },
+        textareaKeys: ["attendees"],
+        numberKeys: ["numberOfAttendees"],
+        attachmentKey: "attachment",
+        attachmentLabel: "Attachment",
+      },
+      listColumns: ["trainingDate", "status", "nextDue"],
+      openStatusField: "status",
+      openValues: ["Scheduled", "Overdue"],
+      openLabel: "Upcoming/Overdue Training",
+    },
   },
 
-  // No historyTab — unlike Machinery's PM+CM, none of these four sub-tables
-  // share an obvious "merged timeline" (each is confirmed, not scheduled).
+  // No historyTab — unlike Machinery's PM+CM, none of these sub-tables share
+  // an obvious "merged timeline" (each is its own confirmed event).
   profileSubTabs: [
+    { subKey: "sdsDocuments", tabKey: "sds", label: "SDS Library", emptyNoun: "SDS revisions" },
     { subKey: "exposureMonitoring", tabKey: "exposure", label: "Exposure Monitoring", emptyNoun: "exposure monitoring records" },
     { subKey: "storageInspection", tabKey: "storage", label: "Storage Inspection", emptyNoun: "storage inspections" },
     { subKey: "labelInspection", tabKey: "label", label: "Label Inspection", emptyNoun: "label inspections" },
     { subKey: "wasteManagement", tabKey: "waste", label: "Waste Management", emptyNoun: "waste disposal records" },
+    { subKey: "training", tabKey: "training", label: "Training", emptyNoun: "training records" },
   ],
 
   // CHRA reused as the risk-assessment tab — not duplicated. The new
@@ -184,23 +275,22 @@ const CHEMICAL_MODULE = defineBusinessModule({
 
   photos: { fieldKey: "Photos", uploadKey: "photos" },
 
-  // "SDS Library" is the Documents-tab pattern scoped to just the SDS field —
-  // Photos still gets its own Profile tab like Machinery, so it's included
-  // here too for a complete Attachments view.
+  // The real, versioned SDS Library is the sdsDocuments sub-table above now.
+  // This stays as a plain "Attachments" view of the master record's own
+  // attachment fields (the original SDS field kept for backward
+  // compatibility, plus Photos) — same role Machinery's Documents tab plays.
   documents: {
-    label: "SDS Library",
+    label: "Attachments",
     fields: [
-      { label: "SDS", key: "SDS" },
+      { label: "SDS (legacy field)", key: "SDS" },
       { label: "Photos", key: "Photos" },
     ],
   },
 
-  attachmentsNote: 'To upload or replace files (SDS, photos), use "Edit / Manage Files" above.',
+  attachmentsNote: 'To upload or replace files, use "Edit / Manage Files" above, or manage SDS revisions from the SDS Library tab.',
 
-  // Emergency Spill Procedure: shows SOP records tagged Document Type =
-  // "Spill Response" rather than a dedicated table (avoids duplicating SOP)
-  // — reuses the existing /api/sop endpoint directly, same as Machinery's
-  // AI-extract endpoints sit outside the generic sub-table shape.
+  // Bespoke tabs that don't fit the generic sub-table shape — same spirit as
+  // Machinery's AI license-extract endpoints sitting outside the framework.
   extraDashboardTabs: [
     {
       key: "spill",
@@ -234,5 +324,543 @@ const CHEMICAL_MODULE = defineBusinessModule({
         }
       },
     },
+    {
+      key: "dosh",
+      label: "DOSH Register",
+      render: () => `
+        <p class="text-dim" style="font-size:13px;margin-bottom:14px;max-width:520px;">
+          Generates the official Register of Chemicals Hazardous to Health, in the format required by the DOSH
+          "Guidelines for the Preparation of a Chemical Register" (USECHH Regulations 2000), directly from the
+          data already stored here — nothing is filled in twice.
+        </p>
+        <button class="btn primary small" data-navigate="/chemical/dosh-register">Generate DOSH Chemical Register →</button>
+      `,
+    },
   ],
+
+  // The "+ Add Chemical" quick-add / Register-page button opens the SDS-
+  // driven wizard (below) instead of the plain master-record overlay form —
+  // see the customAddHandler hook in framework/moduleFramework.js.
+  customAddHandler: () => openAddChemicalWizard(),
 });
+
+// ---------------------------------------------------------------------
+// "+ Add Chemical" wizard — SDS-driven intake, upload-first by design:
+// (1) upload-only screen (drag & drop or browse, PDF only, mandatory),
+// (2) an explicit extraction-progress state while extractSDSData runs
+//     server-side, with Retry / Continue Manually on failure,
+// (3) one combined review screen — every AI-extracted field editable and
+//     pre-filled (visibly highlighted + "AI" badge), every workplace field
+//     blank for the user to complete.
+// Reuses the shared #overlay/#modalBody exactly like every other form in
+// the app (openRecordForm, openSubRecordForm) and the existing Gemini
+// extraction pipeline (server/lib/extract.js's extractSDSData) — no
+// extraction logic is duplicated here, only the file upload + UI around it.
+// ---------------------------------------------------------------------
+
+const GHS_PICTOGRAM_OPTIONS = ["Explosive", "Flammable", "Oxidizing", "Compressed Gas", "Corrosive", "Toxic", "Harmful/Irritant", "Health Hazard", "Environmental Hazard"];
+const HAZARD_CATEGORY_OPTIONS = ["Flammable", "Corrosive", "Toxic", "Irritant", "Oxidizing", "Environmental Hazard", "Other"];
+const TYPE_OF_USE_OPTIONS = ["Raw Material", "Product", "By-product", "Intermediate-product", "Stored", "Waste", "Cleaning", "Degreasing", "Other"];
+const REVIEW_FREQUENCY_OPTIONS = ["Monthly", "Quarterly", "Semi-Annually", "Annually", "Biennially", "Other"];
+const CHEMICAL_STATUS_OPTIONS = ["Active", "Under Review", "Inactive", "Discontinued"];
+// Not exposed via subTables.sdsDocuments.fields (the generic sub-record form
+// only handles single-value inputs) — only the wizard writes these two.
+const SDS_GHS_PICTOGRAMS_FIELD_ID = "fldxiPyErIqlC2r8O";
+const SDS_EXTRACTED_BY_AI_FIELD_ID = "fldGo4nMa2PpHMD3W";
+
+function openAddChemicalWizard() {
+  modalTouchesModulePath = CHEMICAL_MODULE.basePath;
+  renderWizardStep1();
+  overlay.classList.add("open");
+}
+
+// ---- Step 1: upload only (drag & drop or browse), PDF only, mandatory ----
+function renderWizardStep1() {
+  modalTitle.textContent = "Add Chemical";
+  modalBody.innerHTML = `
+    <p class="text-dim" style="font-size:13px;margin-bottom:14px;">Step 1 of 2 — Upload the chemical's Safety Data Sheet (SDS) as a PDF. A PDF is required before you can continue; it's read automatically and used to pre-fill the review step for you to check.</p>
+    <div class="field">
+      <label>SDS Document (PDF only)</label>
+      <div id="wizardDropzone" class="dosh-dropzone">
+        <p>Drag &amp; drop the SDS PDF here</p>
+        <p class="text-dim" style="font-size:11.5px;">or</p>
+        <label class="btn small" style="display:inline-flex;cursor:pointer;">
+          Browse File
+          <input type="file" id="wizardSdsFile" accept="application/pdf" style="display:none" />
+        </label>
+      </div>
+    </div>
+    <div class="flex gap-8" style="margin-top:18px;">
+      <button type="button" class="btn ghost" id="wizardCancelBtn">Cancel</button>
+    </div>
+  `;
+  document.getElementById("wizardCancelBtn").addEventListener("click", closeModal);
+
+  const dropzone = document.getElementById("wizardDropzone");
+  const fileInput = document.getElementById("wizardSdsFile");
+
+  const handleFile = (file) => {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast("Please upload a PDF file — other formats aren't accepted for SDS intake.", true);
+      return;
+    }
+    renderWizardExtracting(file);
+  };
+
+  fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+  dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    handleFile(e.dataTransfer.files[0]);
+  });
+}
+
+// ---- Step 1.5: extraction progress, with Retry / Continue Manually on failure ----
+function renderWizardExtracting(file) {
+  modalBody.innerHTML = `
+    <div style="text-align:center;padding:36px 20px;">
+      <div class="spinner"></div>
+      <p style="margin-top:16px;font-size:13.5px;">Reading <strong>${escapeHtml(file.name)}</strong> with AI…</p>
+      <p class="text-dim" style="font-size:12px;margin-top:6px;">This usually takes a few seconds.</p>
+    </div>
+  `;
+  extractSDSForWizard(file);
+}
+
+async function extractSDSForWizard(file) {
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    // Reuses the existing extraction pipeline exactly — same endpoint the
+    // server builds from server/lib/extract.js's extractSDSData, no
+    // duplicated extraction logic on the client.
+    const res = await api("/chemicals/extract-sds-preview", { method: "POST", body: fd, isForm: true });
+    renderWizardStep2(file, res.suggestion || {});
+  } catch (err) {
+    renderWizardExtractionFailed(file, err.message);
+  }
+}
+
+function renderWizardExtractionFailed(file, message) {
+  modalBody.innerHTML = `
+    <div style="text-align:center;padding:26px 20px;">
+      <p style="font-size:13.5px;color:var(--danger);">Could not read the SDS automatically.</p>
+      <p class="text-dim" style="font-size:12px;margin-top:6px;max-width:380px;margin-left:auto;margin-right:auto;">${escapeHtml(message)}</p>
+      <div class="flex gap-8" style="justify-content:center;margin-top:22px;flex-wrap:wrap;">
+        <button type="button" class="btn primary small" id="wizardRetryBtn">Retry Extraction</button>
+        <button type="button" class="btn small" id="wizardManualBtn">Continue Manually</button>
+        <button type="button" class="btn ghost small" id="wizardCancelBtn3">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("wizardRetryBtn").addEventListener("click", () => renderWizardExtracting(file));
+  document.getElementById("wizardManualBtn").addEventListener("click", () => renderWizardStep2(file, {}));
+  document.getElementById("wizardCancelBtn3").addEventListener("click", closeModal);
+}
+
+// ---- Step 2: one combined review screen ----
+// aiPopulated highlights the field (accent border + "AI" badge) when the
+// extraction actually returned a value for it, so the user can see at a
+// glance what to double-check vs. what needs their own input.
+function wizField(id, label, { type = "text", value = "", rows, aiPopulated = false } = {}) {
+  const val = escapeHtml(value ?? "");
+  const style = aiPopulated ? ' style="border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);"' : "";
+  const badge = aiPopulated ? ' <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span>' : "";
+  if (rows) return `<div class="field"><label>${label}${badge}</label><textarea id="${id}" rows="${rows}"${style}>${val}</textarea></div>`;
+  return `<div class="field"><label>${label}${badge}</label><input type="${type}" id="${id}" value="${val}"${style} /></div>`;
+}
+
+function wizSelect(id, label, options, value, { aiPopulated = false } = {}) {
+  const style = aiPopulated ? ' style="border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);"' : "";
+  const badge = aiPopulated ? ' <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span>' : "";
+  return `<div class="field"><label>${label}${badge}</label><select id="${id}"${style}>
+    <option value="">—</option>
+    ${options.map((o) => `<option value="${o}" ${o === value ? "selected" : ""}>${o}</option>`).join("")}
+  </select></div>`;
+}
+
+function guessHazardCategory(text) {
+  if (!text) return "";
+  const t = String(text).toLowerCase();
+  return HAZARD_CATEGORY_OPTIONS.find((cat) => cat !== "Other" && t.includes(cat.toLowerCase())) || "";
+}
+
+function renderWizardStep2(file, s) {
+  modalTitle.textContent = "Add Chemical — Review";
+  const guessedCategory = guessHazardCategory(s.hazardClassification);
+  const pictograms = new Set(Array.isArray(s.ghsPictograms) ? s.ghsPictograms : []);
+
+  modalBody.innerHTML = `
+    <p class="text-dim" style="font-size:13px;margin-bottom:14px;">Step 2 of 2 — Fields marked <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span> were read from the SDS; check them before saving. Anything the AI couldn't read is left blank below. Then complete the workplace information.</p>
+    <div class="section-head" style="margin-top:0;"><h2 style="font-size:14px;">From the SDS</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      ${wizField("wz_chemicalName", "Chemical Name", { value: s.chemicalName, aiPopulated: !!s.chemicalName })}
+      ${wizField("wz_productName", "Product Name", { value: s.productName, aiPopulated: !!s.productName })}
+      ${wizField("wz_manufacturer", "Manufacturer", { value: s.manufacturer, aiPopulated: !!s.manufacturer })}
+      ${wizField("wz_supplier", "Supplier", { value: s.supplier, aiPopulated: !!s.supplier })}
+      ${wizField("wz_casNumber", "CAS Number", { value: s.casNumber, aiPopulated: !!s.casNumber })}
+      ${wizField("wz_ecNumber", "EC Number", { value: s.ecNumber, aiPopulated: !!s.ecNumber })}
+      ${wizField("wz_revisionDate", "Revision Date", { type: "date", value: s.revisionDate, aiPopulated: !!s.revisionDate })}
+      ${wizField("wz_sdsVersion", "SDS Version (Revision 1 if blank)", { value: s.sdsVersion, aiPopulated: !!s.sdsVersion })}
+      ${wizField("wz_physicalForm", "Physical Form", { value: s.physicalForm, aiPopulated: !!s.physicalForm })}
+      ${wizField("wz_unNumber", "UN Number", { value: s.unNumber, aiPopulated: !!s.unNumber })}
+      ${wizSelect("wz_signalWord", "Signal Word", ["Danger", "Warning", "None"], s.signalWord, { aiPopulated: !!s.signalWord })}
+      ${wizSelect("wz_language", "SDS Language", ["English", "Bahasa Malaysia", "Other"], "English")}
+      ${wizSelect("wz_hazardCategory", "Hazard Classification (category)", HAZARD_CATEGORY_OPTIONS, guessedCategory, { aiPopulated: !!guessedCategory })}
+    </div>
+    <div class="field">
+      <label>GHS Pictograms${pictograms.size ? ' <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span>' : ""}</label>
+      <div class="flex gap-8 flex-wrap" style="margin-top:6px;">
+        ${GHS_PICTOGRAM_OPTIONS.map((p) => `
+          <label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:400;">
+            <input type="checkbox" data-ghs="${p}" ${pictograms.has(p) ? "checked" : ""} /> ${p}
+          </label>`).join("")}
+      </div>
+    </div>
+    ${wizField("wz_hazardClassification", "Hazard Classification (full text, from SDS)", { value: s.hazardClassification, rows: 2, aiPopulated: !!s.hazardClassification })}
+    ${wizField("wz_hStatements", "H Statements", { value: s.hStatements, rows: 2, aiPopulated: !!s.hStatements })}
+    ${wizField("wz_pStatements", "P Statements", { value: s.pStatements, rows: 2, aiPopulated: !!s.pStatements })}
+    ${wizField("wz_firstAid", "First Aid", { value: s.firstAid, rows: 2, aiPopulated: !!s.firstAid })}
+    ${wizField("wz_fireFighting", "Fire Fighting", { value: s.fireFighting, rows: 2, aiPopulated: !!s.fireFighting })}
+    ${wizField("wz_ppeRecommended", "PPE Recommended (per SDS)", { value: s.ppeRecommended, rows: 2, aiPopulated: !!s.ppeRecommended })}
+    ${wizField("wz_storageRequirements", "Storage Requirements", { value: s.storageRequirements, rows: 2, aiPopulated: !!s.storageRequirements })}
+    ${wizField("wz_disposalRequirements", "Disposal Requirements", { value: s.disposalRequirements, rows: 2, aiPopulated: !!s.disposalRequirements })}
+    ${wizField("wz_exposureLimits", "Exposure Limits", { value: s.exposureLimits, rows: 2, aiPopulated: !!s.exposureLimits })}
+    ${wizField("wz_transportInformation", "Transport Information", { value: s.transportInformation, rows: 2, aiPopulated: !!s.transportInformation })}
+
+    <div class="section-head"><h2 style="font-size:14px;">Workplace Information</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      ${wizField("wz_storageLocation", "Storage Location")}
+      ${wizField("wz_department", "Department")}
+      ${wizField("wz_responsiblePerson", "Responsible Person")}
+      ${wizField("wz_quantity", "Quantity")}
+      ${wizField("wz_unit", "Unit (e.g. kg, L, m³)")}
+      ${wizField("wz_internalCode", "Internal Code")}
+      ${wizSelect("wz_reviewFrequency", "Review Frequency", REVIEW_FREQUENCY_OPTIONS, "")}
+      ${wizSelect("wz_status", "Status", CHEMICAL_STATUS_OPTIONS, "Active")}
+    </div>
+
+    <div class="section-head"><h2 style="font-size:14px;">Additional Details <span class="text-dim" style="font-weight:400;font-size:11.5px;">(used in the DOSH Chemical Register)</span></h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      ${wizField("wz_process", "Process")}
+      ${wizField("wz_workersExposed", "No. of Workers Exposed", { type: "number" })}
+      ${wizSelect("wz_typeOfUse", "Type of Use", TYPE_OF_USE_OPTIONS, "")}
+    </div>
+    ${wizField("wz_controlMeasures", "Control Measures", { rows: 2 })}
+    ${wizField("wz_ppeActuallyUsed", "PPE Actually Used", { rows: 2 })}
+    ${wizField("wz_internalRemarks", "Internal Remarks", { rows: 2 })}
+
+    <div class="flex gap-8" style="margin:18px 0;flex-wrap:wrap;">
+      <button type="button" class="btn primary" id="wizardSaveBtn">Save Chemical</button>
+      <button type="button" class="btn ghost" id="wizardBackBtn">← Back</button>
+      <button type="button" class="btn ghost" id="wizardCancelBtn2">Cancel</button>
+    </div>
+  `;
+
+  document.getElementById("wizardCancelBtn2").addEventListener("click", closeModal);
+  document.getElementById("wizardBackBtn").addEventListener("click", () => renderWizardStep1());
+  document.getElementById("wizardSaveBtn").addEventListener("click", () => saveWizard(file, s));
+}
+
+function wv(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+async function saveWizard(file, suggestion) {
+  const btn = document.getElementById("wizardSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const CF = MODULES.chemicals.fields;
+    const chemFields = {};
+    const put = (fieldId, val) => { if (val !== "" && val != null) chemFields[fieldId] = val; };
+    put(CF["Chemical Name"], wv("wz_chemicalName"));
+    put(CF["CAS Number"], wv("wz_casNumber"));
+    put(CF["Supplier"], wv("wz_supplier"));
+    put(CF["Storage Location"], wv("wz_storageLocation"));
+    put(CF["Hazard Classification"], wv("wz_hazardCategory"));
+    put(CF["Quantity"], wv("wz_quantity"));
+    put(CF["Unit"], wv("wz_unit"));
+    put(CF["Exposure Limit"], wv("wz_exposureLimits"));
+    put(CF["Department"], wv("wz_department"));
+    put(CF["Responsible Person"], wv("wz_responsiblePerson"));
+    put(CF["Internal Code"], wv("wz_internalCode"));
+    put(CF["Review Frequency"], wv("wz_reviewFrequency"));
+    put(CF["Status"], wv("wz_status") || "Active");
+    put(CF["Process"], wv("wz_process"));
+    const workers = wv("wz_workersExposed");
+    if (workers !== "") chemFields[CF["No. of Workers Exposed"]] = Number(workers);
+    put(CF["Control Measures"], wv("wz_controlMeasures"));
+    put(CF["PPE Actually Used"], wv("wz_ppeActuallyUsed"));
+    put(CF["Type of Use"], wv("wz_typeOfUse"));
+    put(CF["Internal Remarks"], wv("wz_internalRemarks"));
+
+    if (!chemFields[CF["Chemical Name"]]) {
+      toast("Chemical Name is required.", true);
+      btn.disabled = false;
+      btn.textContent = "Save Chemical";
+      return;
+    }
+
+    const chemical = await CHEMICAL_MODULE._services.master.create(chemFields);
+
+    const SF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
+    const ghsPictograms = Array.from(document.querySelectorAll("[data-ghs]:checked")).map((el) => el.dataset.ghs);
+    const sdsFields = {};
+    const putS = (fieldId, val) => { if (val !== "" && val != null) sdsFields[fieldId] = val; };
+    // "Record the SDS as Revision 1 (Current)" — default the version when
+    // the AI couldn't read one, so the very first SDS for a new chemical is
+    // always explicitly versioned rather than left blank.
+    const sdsVersion = wv("wz_sdsVersion") || "1";
+    putS(SF.sdsReference, `${wv("wz_productName") || wv("wz_chemicalName") || "SDS"} v${sdsVersion}`);
+    sdsFields[SF.chemical] = [chemical.id];
+    putS(SF.productName, wv("wz_productName"));
+    putS(SF.manufacturer, wv("wz_manufacturer"));
+    putS(SF.supplier, wv("wz_supplier"));
+    putS(SF.casNumber, wv("wz_casNumber"));
+    putS(SF.ecNumber, wv("wz_ecNumber"));
+    putS(SF.revisionDate, wv("wz_revisionDate"));
+    putS(SF.sdsVersion, sdsVersion);
+    putS(SF.hazardClassification, wv("wz_hazardClassification"));
+    putS(SF.signalWord, wv("wz_signalWord"));
+    if (ghsPictograms.length) sdsFields[SDS_GHS_PICTOGRAMS_FIELD_ID] = ghsPictograms;
+    putS(SF.hStatements, wv("wz_hStatements"));
+    putS(SF.pStatements, wv("wz_pStatements"));
+    putS(SF.physicalForm, wv("wz_physicalForm"));
+    putS(SF.firstAid, wv("wz_firstAid"));
+    putS(SF.fireFighting, wv("wz_fireFighting"));
+    putS(SF.ppeRecommended, wv("wz_ppeRecommended"));
+    putS(SF.storageRequirements, wv("wz_storageRequirements"));
+    putS(SF.disposalRequirements, wv("wz_disposalRequirements"));
+    putS(SF.exposureLimits, wv("wz_exposureLimits"));
+    putS(SF.unNumber, wv("wz_unNumber"));
+    putS(SF.transportInformation, wv("wz_transportInformation"));
+    putS(SF.language, wv("wz_language") || "English");
+    sdsFields[SF.status] = "Current";
+    sdsFields[SDS_EXTRACTED_BY_AI_FIELD_ID] = Object.keys(suggestion || {}).length > 0;
+
+    const sdsRecord = await CHEMICAL_MODULE._services.sub.sdsDocuments.create(sdsFields);
+    await CHEMICAL_MODULE._services.sub.sdsDocuments.upload(sdsRecord.id, "file", file);
+
+    toast("Chemical added and SDS saved.");
+    closeModal();
+  } catch (err) {
+    toast(err.message, true);
+    btn.disabled = false;
+    btn.textContent = "Save Chemical";
+  }
+}
+
+// ---------------------------------------------------------------------
+// DOSH Chemical Register — generated report (Layer 2). Read-only view over
+// data already captured in the operational system (Layer 1); nothing here
+// is a second place to type things in, except Section A (Company Info,
+// set once and reused) and Section C (who's generating this specific copy).
+// ---------------------------------------------------------------------
+
+const COMPANY_SETTINGS_FIELDS = {
+  companyName: "fldQKivIll8afyhmz",
+  address: "fldpzCUQba9jVCqvc",
+  city: "flde6aRzTMLyymGaJ",
+  postcode: "fld1YyFYWz8dhcE7A",
+  state: "fld2qlFAFBlctMzMc",
+  telephone: "fldJOk1DNlBXjhuJQ",
+  email: "fldiky0dCIBRyt9Tc",
+  doshRegistrationNo: "fldT6YT1L1rtjtrga",
+  codeOfSector: "fldqvcuuJTFolV0hX",
+  classOfIndustry: "fldUHoCQxiw2nznMm",
+  companyActivity: "fldP0PgrfeU8Tg99s",
+};
+
+const DOSH_GEN_FIELDS = {
+  generationReference: "fldFDBFWXCqvMijmI",
+  generatedDate: "fld3tXpmD2HMDL4TK",
+  generatedBy: "fldWjhcA8lxrZjDQq",
+  preparedByName: "fldz4mGogntj9ccuB",
+  preparedByTitle: "fld4kskgsr0UwQgzw",
+  reviewedByName: "fldwtryC9vrCVbkt9",
+  reviewedByTitle: "fldelgPkgOV0dFU7n",
+};
+
+Router.register("/chemical/dosh-register", async () => {
+  const view = document.getElementById("view");
+  const isAdmin = Auth.user()?.role === "Admin";
+  view.innerHTML = `<div class="page-loading">Loading…</div>`;
+
+  let data;
+  try {
+    data = await api("/chemicals/reports/dosh-register-data");
+  } catch (err) {
+    console.error(err);
+    view.innerHTML = Components.emptyState("Could not load the DOSH register data.");
+    return;
+  }
+
+  view.innerHTML = `
+    <div class="no-print">${Components.breadcrumb([
+      { label: "Dashboard", href: "/" },
+      { label: "Chemical Management", href: "/chemical" },
+      { label: "DOSH Chemical Register" },
+    ])}</div>
+    <div id="doshReport"></div>
+  `;
+  renderDoshReport(data, isAdmin);
+});
+
+function renderDoshReport(data, isAdmin) {
+  const c = data.company || {};
+  const activities = c.companyActivity || [];
+
+  document.getElementById("doshReport").innerHTML = `
+    <div class="dosh-report">
+      <div class="no-print flex gap-8" style="justify-content:flex-end;margin-bottom:14px;">
+        ${isAdmin ? `<button class="btn small" id="doshEditCompanyBtn">Edit Company Info</button>` : ""}
+        <button class="btn primary small" id="doshPrintBtn">Print / Save as PDF</button>
+      </div>
+
+      <h1 style="text-align:center;font-size:16px;">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</h1>
+      <p style="text-align:center;font-size:11.5px;" class="text-dim">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
+
+      <h2 style="font-size:13px;margin-top:24px;">SECTION A: COMPANY INFORMATION</h2>
+      <table class="dosh-table">
+        <tr><td><strong>Name</strong></td><td>${escapeHtml(c.companyName || "—")}</td><td><strong>DOSH Registration No.</strong></td><td>${escapeHtml(c.doshRegistrationNo || "—")}</td></tr>
+        <tr><td><strong>Address</strong></td><td>${escapeHtml(c.address || "—")}</td><td><strong>Code of Sector</strong></td><td>${escapeHtml(c.codeOfSector || "—")}</td></tr>
+        <tr><td><strong>City / Postcode</strong></td><td>${escapeHtml([c.city, c.postcode].filter(Boolean).join(" / ") || "—")}</td><td><strong>Class of Industry</strong></td><td>${escapeHtml(c.classOfIndustry || "—")}</td></tr>
+        <tr><td><strong>State</strong></td><td>${escapeHtml(c.state || "—")}</td><td><strong>Company Activity</strong></td><td>${escapeHtml(activities.join(", ") || "—")}</td></tr>
+        <tr><td><strong>Telephone</strong></td><td>${escapeHtml(c.telephone || "—")}</td><td></td><td></td></tr>
+        <tr><td><strong>Email</strong></td><td>${escapeHtml(c.email || "—")}</td><td></td><td></td></tr>
+      </table>
+
+      <h2 style="font-size:13px;margin-top:24px;">SECTION B: LIST OF CHEMICALS HAZARDOUS TO HEALTH</h2>
+      <div class="table-wrap">
+        <table class="dosh-table">
+          <thead><tr>
+            <th>Chemical Name</th><th>CAS No.</th><th>Location</th><th>Process</th><th>Hazard Classification</th>
+            <th>Quantity</th><th>Workers Exposed</th><th>Control Measures</th><th>PPE Used</th><th>Type of Use</th>
+            <th>CSDS (Y/N)</th><th>Label (Y/N)</th><th>Supplier</th>
+          </tr></thead>
+          <tbody>
+            ${data.rows.map((r) => `
+              <tr>
+                <td>${escapeHtml(r.chemicalName || "—")}</td>
+                <td>${escapeHtml(r.casNumber || "—")}</td>
+                <td>${escapeHtml(r.storageLocation || "—")}</td>
+                <td>${escapeHtml(r.process || "—")}</td>
+                <td>${escapeHtml(r.hazardClassification || "—")}</td>
+                <td>${escapeHtml(String(r.quantity || "—"))}</td>
+                <td>${escapeHtml(String(r.workersExposed === "" ? "—" : r.workersExposed))}</td>
+                <td>${escapeHtml(r.controlMeasures || "—")}</td>
+                <td>${escapeHtml(r.ppeActuallyUsed || "—")}</td>
+                <td>${escapeHtml(r.typeOfUse || "—")}</td>
+                <td style="text-align:center;">${r.csds}</td>
+                <td style="text-align:center;">${r.label}</td>
+                <td>${escapeHtml(r.supplier || "—")}</td>
+              </tr>`).join("") || `<tr><td colspan="13" class="text-dim">No chemicals registered yet.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      <h2 style="font-size:13px;margin-top:24px;">SECTION C: NAME OF PERSON WHO PREPARED OR REVIEWED</h2>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <div class="field"><label>Prepared By — Name</label><input type="text" id="doshPreparedName" /></div>
+          <div class="field"><label>Prepared By — Title</label><input type="text" id="doshPreparedTitle" /></div>
+        </div>
+        <div>
+          <div class="field"><label>Reviewed By — Name</label><input type="text" id="doshReviewedName" /></div>
+          <div class="field"><label>Reviewed By — Title</label><input type="text" id="doshReviewedTitle" /></div>
+        </div>
+      </div>
+      <p class="text-dim" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+    </div>
+  `;
+
+  document.getElementById("doshPrintBtn").addEventListener("click", async () => {
+    try {
+      const me = Auth.user();
+      await api("/dosh-register-generations", {
+        method: "POST",
+        body: {
+          fields: {
+            [DOSH_GEN_FIELDS.generationReference]: `DOSH-REG-${Date.now()}`,
+            [DOSH_GEN_FIELDS.generatedDate]: new Date().toISOString(),
+            [DOSH_GEN_FIELDS.generatedBy]: me?.fullName || me?.email || "Unknown",
+            [DOSH_GEN_FIELDS.preparedByName]: document.getElementById("doshPreparedName").value,
+            [DOSH_GEN_FIELDS.preparedByTitle]: document.getElementById("doshPreparedTitle").value,
+            [DOSH_GEN_FIELDS.reviewedByName]: document.getElementById("doshReviewedName").value,
+            [DOSH_GEN_FIELDS.reviewedByTitle]: document.getElementById("doshReviewedTitle").value,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("Could not log DOSH register generation:", err);
+    }
+    window.print();
+  });
+
+  if (isAdmin) {
+    const editBtn = document.getElementById("doshEditCompanyBtn");
+    if (editBtn) editBtn.addEventListener("click", () => openCompanySettingsForm(data.company));
+  }
+}
+
+function openCompanySettingsForm(existing) {
+  modalTouchesModulePath = CHEMICAL_MODULE.basePath;
+  modalTitle.textContent = "Company Information (Section A)";
+  const labels = {
+    companyName: "Company Name", address: "Address", city: "City", postcode: "Postcode", state: "State",
+    telephone: "Telephone", email: "Email", doshRegistrationNo: "DOSH Registration No.",
+    codeOfSector: "Code of Sector", classOfIndustry: "Class of Industry",
+  };
+  const inputs = Object.entries(labels).map(([key, label]) => {
+    const val = existing ? existing[key] : "";
+    return key === "address"
+      ? `<div class="field"><label>${label}</label><textarea id="cs_${key}" rows="2">${escapeHtml(val || "")}</textarea></div>`
+      : `<div class="field"><label>${label}</label><input type="text" id="cs_${key}" value="${escapeHtml(val || "")}" /></div>`;
+  }).join("");
+  const activityOptions = ["Manufacturer", "Distributor", "Formulator", "Importer", "End-User"];
+  const existingActivities = existing?.companyActivity || [];
+
+  modalBody.innerHTML = `
+    <form id="companySettingsForm">
+      ${inputs}
+      <div class="field">
+        <label>Company Activity</label>
+        <div class="flex gap-8 flex-wrap" style="margin-top:6px;">
+          ${activityOptions.map((a) => `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:400;"><input type="checkbox" data-activity="${a}" ${existingActivities.includes(a) ? "checked" : ""} /> ${a}</label>`).join("")}
+        </div>
+      </div>
+      <div class="flex gap-8" style="margin:18px 0;">
+        <button type="submit" class="btn primary">Save</button>
+        <button type="button" class="btn ghost" id="csCancelBtn">Cancel</button>
+      </div>
+    </form>
+  `;
+  document.getElementById("csCancelBtn").addEventListener("click", closeModal);
+  document.getElementById("companySettingsForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fields = {};
+    Object.keys(labels).forEach((key) => {
+      const val = document.getElementById(`cs_${key}`).value.trim();
+      if (val) fields[COMPANY_SETTINGS_FIELDS[key]] = val;
+    });
+    const activities = Array.from(document.querySelectorAll("[data-activity]:checked")).map((el) => el.dataset.activity);
+    if (activities.length) fields[COMPANY_SETTINGS_FIELDS.companyActivity] = activities;
+    try {
+      if (existing && existing.id) {
+        await api(`/company-settings/${existing.id}`, { method: "PATCH", body: { fields } });
+      } else {
+        await api("/company-settings", { method: "POST", body: { fields } });
+      }
+      toast("Company information saved.");
+      closeModal();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+  overlay.classList.add("open");
+}

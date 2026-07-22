@@ -65,6 +65,16 @@ async function fw_getParentNameMap(config) {
   return map;
 }
 
+// Every "+ Add X" entry point (Register page button, Dashboard quick-add)
+// routes through here. Modules that need something other than the plain
+// master-record overlay form — e.g. Chemical Management's SDS-driven wizard
+// — set config.customAddHandler; everything else keeps using the default
+// openRecordForm(modulesKey, null), unchanged.
+function fw_triggerAdd(config) {
+  if (config.customAddHandler) config.customAddHandler();
+  else openRecordForm(config.modulesKey, null);
+}
+
 // listColumns entries are either a plain field-key string, or
 // { key, truncate } for a long free-text field (e.g. a fault description)
 // that should be previewed rather than shown in full in a table cell.
@@ -167,7 +177,7 @@ function renderRegisterPage(config) {
 
   if (isAdmin) {
     document.getElementById("fwRegisterActions").innerHTML = `<button class="btn primary small" id="fwAddBtn">+ ${escapeHtml(config.quickAddLabel)}</button>`;
-    document.getElementById("fwAddBtn").addEventListener("click", () => openRecordForm(config.modulesKey, null));
+    document.getElementById("fwAddBtn").addEventListener("click", () => fw_triggerAdd(config));
   }
 
   config._services.master
@@ -705,7 +715,7 @@ document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-quick-add]");
   if (!btn) return;
   const config = MODULE_REGISTRY[btn.dataset.quickAdd];
-  if (config) openRecordForm(config.modulesKey, null);
+  if (config) fw_triggerAdd(config);
 });
 
 document.addEventListener("change", async (e) => {

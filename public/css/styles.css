@@ -325,3 +325,37 @@ tr.row-click:hover td{background:var(--panel-2);}
   .data-layout{flex-direction:column;}
   .data-sidebar{width:100%;flex-direction:row;overflow-x:auto;}
 }
+
+/* ---------- Add Chemical wizard: SDS drag & drop, extraction spinner ---------- */
+.dosh-dropzone{
+  border:2px dashed var(--border);border-radius:var(--radius);padding:28px 20px;text-align:center;
+  transition:border-color .15s,background .15s;
+}
+.dosh-dropzone.dragover{border-color:var(--accent);background:var(--panel-2);}
+.dosh-dropzone p{margin:4px 0;font-size:13px;}
+.spinner{
+  width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;margin:0 auto;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ---------- DOSH Chemical Register (generated report) ---------- */
+.dosh-report{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px;color:var(--text);}
+.dosh-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
+.dosh-table th,.dosh-table td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
+.dosh-table th{background:var(--panel-2);font-weight:700;white-space:nowrap;}
+
+/* Printing the DOSH register (or any future print view): show only the
+   report itself — no sidebar, breadcrumb, or action buttons — and let the
+   browser's native "Print to PDF" produce the actual file, rather than
+   adding a server-side PDF-generation dependency for something the browser
+   already does natively. */
+@media print{
+  .sidebar,.no-print{display:none !important;}
+  .app-shell{display:block;}
+  .content{margin:0;padding:0;}
+  .dosh-report{border:none;padding:0;background:#fff;color:#000;}
+  .dosh-table th{background:#eee;}
+  .dosh-table th,.dosh-table td{border-color:#999;color:#000;}
+  body{background:#fff;}
+}

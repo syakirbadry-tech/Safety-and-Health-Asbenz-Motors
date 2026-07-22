@@ -21,6 +21,10 @@ const exposureMonitoringRoutes = require("./routes/exposureMonitoring");
 const chemicalStorageInspectionRoutes = require("./routes/chemicalStorageInspection");
 const chemicalLabelInspectionRoutes = require("./routes/chemicalLabelInspection");
 const wasteManagementRoutes = require("./routes/wasteManagement");
+const sdsDocumentsRoutes = require("./routes/sdsDocuments");
+const chemicalSafetyTrainingRoutes = require("./routes/chemicalSafetyTraining");
+const companySettingsRoutes = require("./routes/companySettings");
+const doshRegisterGenerationsRoutes = require("./routes/doshRegisterGenerations");
 const adminRoutes = require("./routes/admin");
 
 const app = express();
@@ -46,6 +50,10 @@ app.use("/api/exposure-monitoring", authenticate, exposureMonitoringRoutes);
 app.use("/api/chemical-storage-inspection", authenticate, chemicalStorageInspectionRoutes);
 app.use("/api/chemical-label-inspection", authenticate, chemicalLabelInspectionRoutes);
 app.use("/api/waste-management", authenticate, wasteManagementRoutes);
+app.use("/api/sds-documents", authenticate, sdsDocumentsRoutes);
+app.use("/api/chemical-safety-training", authenticate, chemicalSafetyTrainingRoutes);
+app.use("/api/company-settings", authenticate, companySettingsRoutes);
+app.use("/api/dosh-register-generations", authenticate, doshRegisterGenerationsRoutes);
 
 // Admin-only (checked inside admin.js)
 app.use("/api/admin", adminRoutes);

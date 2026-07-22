@@ -127,10 +127,20 @@ A module config describes:
 - `subTables` — one entry per linked Airtable table (field-ID map, form field metadata, which columns to list, optional "due soon / overdue" or "open count" KPI wiring).
 - an optional `historyTab` (merges two or more sub-tables into one timeline — Machinery uses this for Preventive + Corrective Maintenance; Chemical Management doesn't, since none of its sub-tables share an obvious merged view),
 - an optional `riskAssessment` (points at an existing table to reuse as the module's Risk Assessment tab — HIRARC for Machinery, CHRA for Chemical Management — never a new table),
-- `photos`/`documents` config for the attachment-gallery and cross-record Documents/SDS Library tabs,
-- an optional `extraDashboardTabs` escape hatch for a module-specific tab that doesn't fit the generic sub-table shape (Chemical Management's Emergency Spill Procedure, which filters the shared SOP table by a `Document Type` field instead of using a dedicated table).
+- `photos`/`documents` config for the attachment-gallery and cross-record Documents tabs,
+- an optional `extraDashboardTabs` escape hatch for a module-specific tab that doesn't fit the generic sub-table shape (Chemical Management's Emergency Spill Procedure, which filters the shared SOP table by a `Document Type` field instead of using a dedicated table; also how its "DOSH Register" launch tab is wired in),
+- an optional `customAddHandler` — when a module's "+ Add" flow needs to be more than the plain master-record overlay form, this is called instead of the default `openRecordForm(modulesKey, null)` for both the Register page's Add button and the Dashboard's quick-add button. Chemical Management uses this for its SDS-driven "+ Add Chemical" wizard (upload SDS → AI extraction → one combined editable review screen, covering both the AI-extracted fields and workplace-specific fields) — see §5.2.1. Machinery doesn't set it, so it keeps the default.
 
-Two reference configs exist: `public/js/pages/machinery.module.js` (the original implementation, extracted into this shape without behavior change — verified via a full regression pass) and `public/js/pages/chemical.module.js` (built directly on the framework — no page-rendering code was written for Chemical Management, only the config and new Airtable tables). A future module (Noise Management, Operational Safety) should only need the same: new Airtable tables + a new config file.
+Two reference configs exist: `public/js/pages/machinery.module.js` (the original implementation, extracted into this shape without behavior change — verified via a full regression pass) and `public/js/pages/chemical.module.js` (built directly on the framework — the only new page-rendering code Chemical Management needed beyond config was the wizard and the DOSH register report, both module-specific bespoke additions in the same spirit as Machinery's AI license-extract endpoints). A future module (Noise Management, Operational Safety) should only need the same: new Airtable tables + a new config file.
+
+#### 5.2.1 DOSH-compliant Chemical Management: two-layer design
+
+Chemical Management is deliberately split into two layers, per the DOSH "Guidelines for the Preparation of a Chemical Register" (USECHH Regulations 2000):
+
+- **Layer 1 — the operational system.** The module framework's usual Dashboard/Register/Profile pages, plus the SDS-driven "+ Add Chemical" wizard and a versioned `SDS Documents` table (§3.4.2 of DATABASE.md) — this is the daily working interface.
+- **Layer 2 — DOSH compliance.** A generated, read-only report (`/chemical/dosh-register`) that reproduces the guidance document's Section A (Company Information) / Section B (per-chemical hazard-and-usage table) / Section C (Prepared By/Reviewed By) layout entirely from Layer 1 data — nothing is filled in twice. `GET /api/chemicals/reports/dosh-register-data` aggregates it server-side, including two flags computed at request time rather than stored (CSDS Y/N, Label Y/N), since both already exist elsewhere in the system. The browser's native "Print to PDF" produces the actual file — no server-side PDF-generation dependency was added.
+
+SDS revisions are never overwritten: `server/routes/sdsDocuments.js` intercepts record creation so that saving a new revision as the Current one automatically flips any prior Current revision(s) for that chemical to Superseded, preserving full history — the one route in the app where the generic `buildModuleRouter` factory's default create behavior wasn't reusable as-is (see the code comment there for why).
 
 ### 5.3 Legacy per-table modules (HRA, HIRARC, SOP)
 
