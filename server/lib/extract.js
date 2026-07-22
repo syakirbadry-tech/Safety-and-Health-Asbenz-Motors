@@ -8,7 +8,12 @@
 const fetch = require("node-fetch");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = "gemini-2.0-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+console.log({
+  model: MODEL,
+  keyPrefix: GEMINI_API_KEY ? GEMINI_API_KEY.substring(0, 8) : "NO_KEY",
+});
 
 const EXTRACTION_PROMPT = `You are reading a scanned machinery license/certificate document for a workshop safety compliance system (Asbenz Motors).
 
