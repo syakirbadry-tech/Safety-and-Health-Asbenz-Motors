@@ -342,3 +342,20 @@ The framework must remain the single source of truth for:
 - Navigation
 
 Business modules may only extend the framework through configuration, not by creating independent implementations.
+## Regulatory Compliance
+
+The Chemical Management module SHALL comply with:
+
+- Occupational Safety and Health (Use and Standards of Exposure of Chemicals Hazardous to Health) Regulations 2000 (USECHH)
+
+Reference documents:
+
+- /docs/regulations/DOSH_USECHH_Chemical_Register_Guideline.pdf
+
+When implementing:
+
+- Do not invent field names.
+- Follow the official DOSH guidance.
+- The operational database may contain additional fields.
+- The generated Chemical Register must match the official DOSH recommended layout.
+- Never remove mandatory DOSH-required information.
