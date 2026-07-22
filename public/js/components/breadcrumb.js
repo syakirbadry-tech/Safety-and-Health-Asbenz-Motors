@@ -1,5 +1,6 @@
 // items: [{label, href}, ...] — the last item renders as plain (current) text.
-const Components = window.Components || {};
+// var, not const/let — see the comment in components/cards.js.
+var Components = window.Components || {};
 
 Components.breadcrumb = (items) => {
   const parts = items.map((item, i) => {

@@ -1,7 +1,11 @@
 // Reusable card/badge primitives shared by every module dashboard.
 // Pure functions: data in, HTML string out — no DOM coupling, so they stay
 // portable if the rendering layer ever changes.
-const Components = window.Components || {};
+// var, not const/let: every components/*.js file declares this at top level,
+// and classic <script> tags share one global lexical scope — a repeated
+// const/let here throws "Identifier 'Components' has already been declared"
+// on every file after the first, silently dropping their exports.
+var Components = window.Components || {};
 
 const TONE_VAR = { ok: "var(--green)", warn: "var(--amber)", bad: "var(--red)", neutral: "var(--gray)" };
 

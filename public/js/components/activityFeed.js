@@ -4,7 +4,8 @@
 // records vs. the admin API's flattened rows) — keeps this component decoupled
 // from Airtable's field-ID shape. Reused by the top-level Dashboard
 // (cross-module) and the Machine Profile's Activity Timeline tab.
-const Components = window.Components || {};
+// var, not const/let — see the comment in components/cards.js.
+var Components = window.Components || {};
 
 Components.activityFeed = (items, { limit = 12, emptyLabel = "No activity yet." } = {}) => {
   if (!items.length) return Components.emptyState(emptyLabel);

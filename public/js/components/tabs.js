@@ -8,7 +8,8 @@
 // onChange(key) fires whenever a tab is shown (including the initial one) —
 // lets a page remember which tab was active across a full re-render (e.g.
 // after a save forces the page to refetch and rebuild from scratch).
-const Components = window.Components || {};
+// var, not const/let — see the comment in components/cards.js.
+var Components = window.Components || {};
 
 Components.mountTabs = (container, { tabs, initialKey, onChange }) => {
   const panelCache = {};

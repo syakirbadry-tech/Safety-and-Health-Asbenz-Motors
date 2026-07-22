@@ -1,6 +1,7 @@
 // Reusable data table. Rows navigate via the router's [data-navigate]
 // click delegation (see router.js) instead of per-row listeners.
-const Components = window.Components || {};
+// var, not const/let — see the comment in components/cards.js.
+var Components = window.Components || {};
 
 Components.dataTable = ({ columns, rows, emptyLabel = "No records yet." }) => {
   if (!rows.length) return Components.emptyState(emptyLabel);
