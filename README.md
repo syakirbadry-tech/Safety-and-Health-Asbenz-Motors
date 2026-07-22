@@ -1,11 +1,17 @@
 # OSH-C Portal — Asbenz Motors
 
 A login-protected web app for the OSH-C Compliance Tracker: role-based access
-(Admin vs HR/view-only), a Machinery/CHRA/HRA/HIRARC/SOP dashboard with file
-uploads (licenses, service history, SDS), an Admin panel for managing users
-and passwords, and an automatic login/activity history — all backed by your
-existing Airtable base. Works on desktop and on mobile (iPhone Safari,
-Android Chrome) since it's just a responsive web page.
+(Admin vs HR/view-only), organized around business functions — Machinery has
+its own full dashboard (register, certificates of fitness, preventive/
+corrective maintenance, inspection, calibration, risk assessment, per-machine
+profile pages) with file uploads (licenses, service history, SDS), an Admin
+panel for managing users and passwords, and an automatic login/activity
+history — all backed by your existing Airtable base. Chemical Management,
+Noise Management and Operational Safety (CHRA/HRA/HIRARC/SOP) are being
+rebuilt into the same style of dashboard in upcoming milestones — see
+PROJECT_ROADMAP.md — and for now still open as classic record lists. Works on
+desktop and on mobile (iPhone Safari, Android Chrome) since it's just a
+responsive web page.
 
 Your Airtable Personal Access Token stays on the server only. The browser
 never sees it — every screen talks to this app's own `/api/...` routes,

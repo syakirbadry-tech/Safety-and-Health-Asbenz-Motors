@@ -2,6 +2,7 @@ const multer = require("multer");
 const schema = require("../lib/schema");
 const airtable = require("../lib/airtable");
 const { buildModuleRouter } = require("../lib/moduleRouter");
+const { buildProfileRoute } = require("../lib/profileAggregation");
 const { extractLicenseData } = require("../lib/extract");
 const { logActivity } = require("../lib/activity");
 
@@ -13,6 +14,7 @@ const router = buildModuleRouter({
   attachmentFields: {
     license: schema.machinery.fields.licenseDocument,
     serviceHistory: schema.machinery.fields.serviceHistory,
+    photos: schema.machinery.fields.photos,
   },
 });
 
@@ -85,5 +87,29 @@ router.post("/extract-license-preview", upload.single("file"), async (req, res) 
     res.status(err.status || 400).json({ error: err.message || "Extraction failed." });
   }
 });
+
+// GET /:id/profile — aggregates the machine record with every linked
+// sub-record (CF, PM, CM, Inspection, Calibration, HIRARC risk assessments,
+// Activity Log) in a single call, built from the generic module-framework
+// profile aggregator (server/lib/profileAggregation.js) — see that file for
+// why linked sub-tables are filtered in application code rather than via
+// Airtable's filterByFormula.
+router.get(
+  "/:id/profile",
+  buildProfileRoute({
+    masterTableId: schema.machinery.tableId,
+    masterNameFieldId: schema.machinery.fields.machineName,
+    moduleName: "Machinery",
+    logActivity,
+    subTables: [
+      { key: "cf", tableId: schema.machineryCF.tableId, linkFieldId: schema.machineryCF.fields.machine },
+      { key: "pm", tableId: schema.preventiveMaintenance.tableId, linkFieldId: schema.preventiveMaintenance.fields.machine },
+      { key: "cm", tableId: schema.correctiveMaintenance.tableId, linkFieldId: schema.correctiveMaintenance.fields.machine },
+      { key: "inspection", tableId: schema.machineryInspection.tableId, linkFieldId: schema.machineryInspection.fields.machine },
+      { key: "calibration", tableId: schema.calibrationRecords.tableId, linkFieldId: schema.calibrationRecords.fields.machine },
+      { key: "hirarc", tableId: schema.hirarc.tableId, linkFieldId: schema.hirarc.fields.machinery },
+    ],
+  })
+);
 
 module.exports = router;

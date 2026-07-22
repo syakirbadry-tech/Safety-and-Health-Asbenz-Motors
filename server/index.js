@@ -7,10 +7,20 @@ const { authenticate } = require("./middleware/auth");
 
 const authRoutes = require("./routes/auth");
 const machineryRoutes = require("./routes/machinery");
+const machineryCFRoutes = require("./routes/machineryCF");
+const preventiveMaintenanceRoutes = require("./routes/preventiveMaintenance");
+const correctiveMaintenanceRoutes = require("./routes/correctiveMaintenance");
+const machineryInspectionRoutes = require("./routes/machineryInspection");
+const calibrationRecordsRoutes = require("./routes/calibrationRecords");
 const chraRoutes = require("./routes/chra");
 const hraRoutes = require("./routes/hra");
 const hirarcRoutes = require("./routes/hirarc");
 const sopRoutes = require("./routes/sop");
+const chemicalsRoutes = require("./routes/chemicals");
+const exposureMonitoringRoutes = require("./routes/exposureMonitoring");
+const chemicalStorageInspectionRoutes = require("./routes/chemicalStorageInspection");
+const chemicalLabelInspectionRoutes = require("./routes/chemicalLabelInspection");
+const wasteManagementRoutes = require("./routes/wasteManagement");
 const adminRoutes = require("./routes/admin");
 
 const app = express();
@@ -22,10 +32,20 @@ app.use("/api/auth", authRoutes);
 
 // Everything below requires a valid session (any role)
 app.use("/api/machinery", authenticate, machineryRoutes);
+app.use("/api/machinery-cf", authenticate, machineryCFRoutes);
+app.use("/api/preventive-maintenance", authenticate, preventiveMaintenanceRoutes);
+app.use("/api/corrective-maintenance", authenticate, correctiveMaintenanceRoutes);
+app.use("/api/machinery-inspection", authenticate, machineryInspectionRoutes);
+app.use("/api/calibration-records", authenticate, calibrationRecordsRoutes);
 app.use("/api/chra", authenticate, chraRoutes);
 app.use("/api/hra", authenticate, hraRoutes);
 app.use("/api/hirarc", authenticate, hirarcRoutes);
 app.use("/api/sop", authenticate, sopRoutes);
+app.use("/api/chemicals", authenticate, chemicalsRoutes);
+app.use("/api/exposure-monitoring", authenticate, exposureMonitoringRoutes);
+app.use("/api/chemical-storage-inspection", authenticate, chemicalStorageInspectionRoutes);
+app.use("/api/chemical-label-inspection", authenticate, chemicalLabelInspectionRoutes);
+app.use("/api/waste-management", authenticate, wasteManagementRoutes);
 
 // Admin-only (checked inside admin.js)
 app.use("/api/admin", adminRoutes);

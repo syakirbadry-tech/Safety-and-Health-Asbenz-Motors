@@ -264,8 +264,26 @@ tr.row-click:hover td{background:var(--panel-2);}
 .flex-wrap{flex-wrap:wrap;}
 .gap-8{gap:8px;}
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border-soft);margin-bottom:18px;overflow-x:auto;}
-.tab{padding:10px 4px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;}
-.tab.active{color:var(--text);border-color:var(--accent);}
+.tab{padding:10px 4px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;background:none;border-left:none;border-right:none;border-top:none;font-family:inherit;}
+.tab.active{color:var(--text);border-bottom-color:var(--accent);}
+
+/* ---------- Router-driven pages: breadcrumb + module dashboards ---------- */
+.breadcrumb{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-bottom:10px;flex-wrap:wrap;}
+.breadcrumb a{color:var(--muted);cursor:pointer;}
+.breadcrumb a:hover{color:var(--accent);}
+.breadcrumb .sep{color:var(--border);}
+.breadcrumb .current{color:var(--text-strong);font-weight:600;}
+.page-loading{padding:40px 0;color:var(--muted);font-size:13px;}
+.module-banner{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;margin-bottom:20px;font-size:13px;color:var(--muted-2);
+}
+.activity-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-soft);font-size:12.5px;}
+.activity-item:last-child{border-bottom:none;}
+.activity-item .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);margin-top:5px;flex:none;}
+.activity-item .body{flex:1;min-width:0;}
+.activity-item .when{color:var(--muted);font-size:11px;margin-top:2px;}
 
 /* ---------- Data Browser (phpMyAdmin-style raw grid) ---------- */
 .data-layout{display:flex;gap:18px;align-items:flex-start;}

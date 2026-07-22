@@ -12,7 +12,7 @@
 
 <div class="app-shell">
   <aside class="sidebar">
-    <a class="brand" href="/index.html">
+    <a class="brand" href="/" data-navigate="/">
       <div class="logo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
       <div>
         <h1>OSH-C Portal</h1>
@@ -20,7 +20,7 @@
       </div>
     </a>
     <nav class="side-nav">
-      <a href="/index.html" class="active">Dashboard</a>
+      <a href="/" data-navigate="/" data-route="/" class="active">Dashboard</a>
       <a href="/admin.html" id="adminLink" class="hidden">Admin</a>
     </nav>
     <div class="side-footer" id="profileWrap" style="position:relative;">
@@ -39,20 +39,7 @@
   </aside>
 
   <main class="content">
-    <div class="page">
-      <div class="page-head">
-        <div class="eyebrow">Occupational Safety &amp; Health Committee</div>
-        <h1 id="greeting">Good day 👋</h1>
-        <p>Track machinery, CHRA, HRA, HIRARC and SOP compliance across the Asbenz Motors workshop.</p>
-        <span class="snapshot" id="snapshotTime"></span>
-      </div>
-
-      <div class="section-head"><h2>Modules</h2><span class="hint">Tap a tile to view records</span></div>
-      <div class="grid" id="moduleGrid"></div>
-
-      <div class="section-head"><h2>Compliance Overview</h2></div>
-      <div class="stats" id="statGrid"></div>
-    </div>
+    <div class="page" id="view"><div class="page-loading">Loading…</div></div>
   </main>
 </div>
 
@@ -71,6 +58,17 @@
 
 <script src="/js/api.js"></script>
 <script src="/js/modules.config.js"></script>
+<script src="/js/router.js"></script>
+<script src="/js/components/cards.js"></script>
+<script src="/js/components/table.js"></script>
+<script src="/js/components/tabs.js"></script>
+<script src="/js/components/breadcrumb.js"></script>
+<script src="/js/components/activityFeed.js"></script>
+<script src="/js/services/linkedTableService.js"></script>
+<script src="/js/framework/moduleFramework.js"></script>
+<script src="/js/pages/machinery.module.js"></script>
+<script src="/js/pages/chemical.module.js"></script>
+<script src="/js/pages/dashboard.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

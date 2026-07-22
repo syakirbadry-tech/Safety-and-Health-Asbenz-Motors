@@ -24,84 +24,54 @@ document.addEventListener("click", (e) => {
 
 document.getElementById("changePwBtn").addEventListener("click", () => openChangePassword());
 
-// ---------- Hero greeting ----------
-(function greet() {
-  const h = new Date().getHours();
-  const part = h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
-  const first = (me?.fullName || "there").split(" ")[0];
-  document.getElementById("greeting").textContent = `Good ${part}, ${first} \u{1F44B}`;
-  document.getElementById("snapshotTime").textContent =
-    "Live data · " + new Date().toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" });
-})();
+// ---------- Legacy module record cache ----------
+// key -> records[]. Populated on demand (see ensureLegacyLoaded) rather than
+// eagerly for every module on every page load, since CHRA/HRA/HIRARC/SOP are
+// now reached through the "Chemical Management" / "Noise Management" /
+// "Operational Safety" placeholder pages (see pages/dashboard.js) instead of
+// always being fetched up front on the old single-page dashboard.
+const state = {};
 
-// ---------- Load all modules + build tiles/stats ----------
-const state = {}; // key -> records[]
-
-async function loadAll() {
-  const grid = document.getElementById("moduleGrid");
-  grid.innerHTML = "";
-  const stats = { expired: 0, dueSoon: 0, valid: 0, noDate: 0 };
-
-  for (const mod of Object.values(MODULES)) {
-    let records = [];
-    try {
-      const data = await api(mod.api);
-      records = data.records || [];
-    } catch (err) {
-      console.error(mod.key, err);
-    }
-    state[mod.key] = records;
-
-    records.forEach((r) => {
-      const dateVal = r.fields[mod.fields[mod.dateField]];
-      const days = daysUntil(dateVal);
-      if (days === null) stats.noDate++;
-      else if (days < 0) stats.expired++;
-      else if (days <= 30) stats.dueSoon++;
-      else stats.valid++;
-    });
-
-    grid.insertAdjacentHTML("beforeend", tileHtml(mod, records.length));
+async function refreshState(key) {
+  try {
+    const data = await api(MODULES[key].api);
+    state[key] = data.records || [];
+  } catch (err) {
+    console.error(key, err);
   }
-
-  document.getElementById("statGrid").innerHTML = `
-    <div class="stat-card" style="border-color:var(--red)"><div class="n">${stats.expired}</div><div class="l">Expired</div></div>
-    <div class="stat-card" style="border-color:var(--amber)"><div class="n">${stats.dueSoon}</div><div class="l">Due Soon (30d)</div></div>
-    <div class="stat-card" style="border-color:var(--green)"><div class="n">${stats.valid}</div><div class="l">Valid</div></div>
-    <div class="stat-card" style="border-color:var(--gray)"><div class="n">${stats.noDate}</div><div class="l">No Date Set</div></div>
-  `;
-
-  document.querySelectorAll(".tile[data-mod]").forEach((el) => {
-    el.addEventListener("click", () => openModuleList(el.dataset.mod));
-  });
+  return state[key];
 }
 
-function tileHtml(mod, count) {
-  return `
-    <div class="tile" data-mod="${mod.key}">
-      <div class="tile-icon"><svg viewBox="0 0 24 24" fill="none">${ICONS[mod.icon]}</svg></div>
-      <div><h3>${mod.title}</h3><p>${mod.desc}</p></div>
-      <div class="tile-footer">
-        <span class="text-dim">${count} record${count === 1 ? "" : "s"}</span>
-        ${count === 0 ? '<span class="badge neutral">NO RECORDS</span>' : '<span class="badge ok">TRACKED</span>'}
-      </div>
-    </div>`;
+async function ensureLegacyLoaded(key) {
+  if (!state[key]) await refreshState(key);
+  return state[key];
 }
-
-loadAll();
 
 // ---------- Module list overlay ----------
 const overlay = document.getElementById("overlay");
 const modalBody = document.getElementById("modalBody");
 const modalTitle = document.getElementById("modalTitle");
 
+// Set to a module's basePath (e.g. "/machinery") only while the currently-
+// open overlay is showing that module's master or sub-record data — see
+// openRecordForm and openSubRecordForm (framework/moduleFramework.js). Lets
+// closeModal() refresh the router-driven page underneath only when that's
+// actually relevant, instead of on every modal close (e.g. Change Password,
+// reachable from any page via the sidebar). null for legacy modules
+// (CHRA/HRA/HIRARC/SOP), which don't have a router-driven page to refresh.
+let modalTouchesModulePath = null;
+
 function closeModal() {
   overlay.classList.remove("open");
+  if (modalTouchesModulePath && location.pathname.startsWith(modalTouchesModulePath)) {
+    Router.navigate(location.pathname, { replace: true });
+  }
 }
 document.getElementById("modalClose").addEventListener("click", closeModal);
 overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
 
 function openModuleList(key) {
+  modalTouchesModulePath = null;
   const mod = MODULES[key];
   const records = state[key] || [];
   modalTitle.textContent = mod.title;
@@ -152,6 +122,7 @@ function openModuleList(key) {
 let pendingNewRecordFile = null;
 
 function openRecordForm(key, record) {
+  modalTouchesModulePath = FRAMEWORK_MODULE_BASE_PATHS[key] || null;
   const mod = MODULES[key];
   if (!record) pendingNewRecordFile = null;
   modalTitle.textContent = record ? (record.fields[mod.fields[mod.primary]] || mod.title) : `New ${mod.title}`;
@@ -170,7 +141,7 @@ function openRecordForm(key, record) {
   }).join("");
 
   const complianceVal = record ? record.fields[mod.complianceFieldId] : null;
-  const complianceHtml = record
+  const complianceHtml = record && mod.complianceFieldId
     ? `<div class="field"><label>Compliance Status (auto)</label><input type="text" value="${escapeHtml(complianceVal || "—")}" disabled /></div>`
     : "";
 
@@ -192,7 +163,16 @@ function openRecordForm(key, record) {
     <div class="record-list">${attachmentsHtml}</div>
   `;
 
-  document.getElementById("backBtn").addEventListener("click", () => openModuleList(key));
+  // Framework-driven modules (Machinery, and any future module defined via
+  // defineBusinessModule) are reached from the router-driven pages (Register,
+  // Profile, Dashboard quick action) now, not the legacy single-page grid —
+  // closing back to whichever of those is underneath is correct there, while
+  // CHRA/HRA/HIRARC/SOP still use the legacy list-inside-overlay flow until
+  // their own module dashboard ships.
+  document.getElementById("backBtn").addEventListener("click", () => {
+    if (FRAMEWORK_MODULE_BASE_PATHS[key]) closeModal();
+    else openModuleList(key);
+  });
 
   if (isAdmin) {
     document.getElementById("recordForm").addEventListener("submit", async (e) => {
@@ -228,7 +208,7 @@ function openRecordForm(key, record) {
             toast("Created.");
           }
         }
-        await loadAll();
+        await refreshState(key);
         openRecordForm(key, record);
       } catch (err) {
         toast(err.message, true);
@@ -242,8 +222,9 @@ function openRecordForm(key, record) {
         try {
           await api(`${mod.api}/${record.id}`, { method: "DELETE" });
           toast("Deleted.");
-          await loadAll();
-          openModuleList(key);
+          await refreshState(key);
+          if (FRAMEWORK_MODULE_BASE_PATHS[key]) closeModal();
+          else openModuleList(key);
         } catch (err) {
           toast(err.message, true);
         }
@@ -352,7 +333,7 @@ modalBody?.addEventListener?.("change", async (e) => {
     if (attachment?.aiExtract) {
       toast("Uploading & reading document with AI…");
       const res = await api(`${mod.api}/${recordId}/${attachment.extractEndpoint}`, { method: "POST", body: fd, isForm: true });
-      await loadAll();
+      await refreshState(key);
       const rec = state[key].find((r) => r.id === recordId);
       openRecordForm(key, rec);
       if (res.suggestion) {
@@ -365,7 +346,7 @@ modalBody?.addEventListener?.("change", async (e) => {
       toast("Uploading…");
       await api(`${mod.api}/${recordId}/upload/${attKey}`, { method: "POST", body: fd, isForm: true });
       toast("File uploaded.");
-      await loadAll();
+      await refreshState(key);
       const rec = state[key].find((r) => r.id === recordId);
       openRecordForm(key, rec);
     }
@@ -399,6 +380,7 @@ function applyAiSuggestion(mod, suggestion) {
 
 // ---------- Change password ----------
 function openChangePassword() {
+  modalTouchesModulePath = null;
   document.getElementById("profileMenu").classList.add("hidden");
   modalTitle.textContent = "Change password";
   modalBody.innerHTML = `
@@ -433,6 +415,6 @@ function openChangePassword() {
   overlay.classList.add("open");
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-}
+// ---------- Boot the router (all page routes are registered by pages/*.js,
+// loaded before this file) ----------
+Router.start();

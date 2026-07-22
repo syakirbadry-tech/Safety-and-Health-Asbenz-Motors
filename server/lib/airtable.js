@@ -44,6 +44,7 @@ async function listRecords(tableId, params = {}) {
   qs.set("returnFieldsByFieldId", "true");
   if (params.pageSize) qs.set("pageSize", params.pageSize);
   if (params.view) qs.set("view", params.view);
+  if (params.filterByFormula) qs.set("filterByFormula", params.filterByFormula);
   (params.fieldIds || []).forEach((f) => qs.append("fields[]", f));
   let offset;
   let records = [];
