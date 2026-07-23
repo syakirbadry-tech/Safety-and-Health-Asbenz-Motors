@@ -199,6 +199,7 @@ const MODULES = {
     complianceFieldId: "fld66TA1vtTz1vZ33",
     attachments: [{ key: "document", fieldId: "fldVSqjYdjVGkpzsl", label: "Document" }],
   },
+
   // Corrective Actions/CAPA engine — see public/js/pages/actions.module.js
   // for the register/filter/quick-filter UI built on top of this.
   actions: {
@@ -237,6 +238,58 @@ const MODULES = {
     attachments: [{ key: "evidence", fieldId: "fldcMemMVPD61YhDp", label: "Evidence" }],
   },
 
+  oshCommitteeMeetings: {
+    key: "oshCommitteeMeetings",
+    api: "/osh-committee-meetings",
+    title: "OSH Committee Meetings",
+    desc: "Meeting schedule, agenda and minutes",
+    icon: "users",
+    dateField: "Meeting Date",
+    primary: "Meeting Reference",
+    fields: {
+      "Meeting Reference": "fldickz4PRwcv9rO3",
+      "Meeting Date": "fldZGpIXRoqoflszP",
+      "Meeting Type": "fldI3X7axiHP8jFmz",
+      "Chairperson": "fld4osE8hthsTZuUs",
+      "Secretary": "fldohhPXTQKe39P5A",
+      "Attendees": "fldKKMGx2LH8Apdca",
+      "Agenda": "fld4PXKsNoVsvyda1",
+      "Key Decisions / Notes": "fld7PMXsFHZa3KlZC",
+      "Next Meeting Date": "fldTujGNnbaF7SVph",
+      "Status": "fld4WT2X077icEU2Q",
+    },
+    dateKeys: ["Meeting Date", "Next Meeting Date"],
+    textareaKeys: ["Attendees", "Agenda", "Key Decisions / Notes"],
+    listColumns: ["Meeting Reference", "Meeting Date", "Meeting Type", "Status"],
+    complianceFieldId: null,
+    attachments: [{ key: "minutes", fieldId: "fld23dCRfWj7hDMkL", label: "Minutes" }],
+  },
+
+  // Flat roster — no framework module, just the shared openRecordForm modal
+  // from a small bespoke page (public/js/pages/oshCommitteeMembers.js).
+  oshCommitteeMembers: {
+    key: "oshCommitteeMembers",
+    api: "/osh-committee-members",
+    title: "OSH Committee Members",
+    desc: "Committee roster, roles and term",
+    icon: "users",
+    dateField: "Term End",
+    primary: "Member Name",
+    fields: {
+      "Member Name": "fldg0krOq6zyPsWNY",
+      "Position": "fldEhBz50mhciiTN6",
+      "Department": "fldIh01nYz89HlFDI",
+      "Term Start": "fldEV0IFHEqE7HWkq",
+      "Term End": "fldVv5QAq8Rsrb21w",
+      "Contact": "fld1lVjRvAtj24PSF",
+      "Status": "fldnK0oZmW78mfM1z",
+    },
+    dateKeys: ["Term Start", "Term End"],
+    textareaKeys: [],
+    listColumns: ["Member Name", "Position", "Department", "Status"],
+    complianceFieldId: null,
+    attachments: [],
+  },
 };
 
 // ---------------------------------------------------------------------
@@ -286,6 +339,14 @@ const BUSINESS_MODULES = [
     desc: "Corrective and preventive actions across every module",
     icon: "checklist",
     route: "/capa",
+    ready: true,
+  },
+  {
+    key: "oshCommittee",
+    title: "OSH Committee",
+    desc: "Committee members, meeting schedule & minutes",
+    icon: "users",
+    route: "/osh-committee",
     ready: true,
   },
 ];
@@ -414,4 +475,5 @@ const ICONS = {
   overview: '<path d="M4 19V5M4 19h16M8 19v-6m4 6v-9m4 9V8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
   admin: '<circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
   checklist: '<rect x="4" y="3.5" width="16" height="17" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 8.5l1.3 1.3L11 7.5M7.5 14.5l1.3 1.3 2.2-2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 8.5h3M13.5 14.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+  users: '<circle cx="9" cy="8" r="2.8" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 19c.9-3.4 3-5.2 5.5-5.2s4.6 1.8 5.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="16.5" cy="8.5" r="2.2" stroke="currentColor" stroke-width="1.5"/><path d="M15 13.6c2 .1 3.6 1.6 4.3 4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
 };
