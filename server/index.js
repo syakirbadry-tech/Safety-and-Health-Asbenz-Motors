@@ -27,6 +27,9 @@ const chemicalSafetyTrainingRoutes = require("./routes/chemicalSafetyTraining");
 const companySettingsRoutes = require("./routes/companySettings");
 const doshRegisterGenerationsRoutes = require("./routes/doshRegisterGenerations");
 const configRoutes = require("./routes/config");
+const actionsRoutes = require("./routes/actions");
+const oshCommitteeMeetingsRoutes = require("./routes/oshCommitteeMeetings");
+const oshCommitteeMembersRoutes = require("./routes/oshCommitteeMembers");
 const adminRoutes = require("./routes/admin");
 
 const app = express();
@@ -58,6 +61,9 @@ app.use("/api/chemical-safety-training", authenticate, chemicalSafetyTrainingRou
 app.use("/api/company-settings", authenticate, companySettingsRoutes);
 app.use("/api/dosh-register-generations", authenticate, doshRegisterGenerationsRoutes);
 app.use("/api/config", authenticate, configRoutes);
+app.use("/api/actions", authenticate, actionsRoutes);
+app.use("/api/osh-committee-meetings", authenticate, oshCommitteeMeetingsRoutes);
+app.use("/api/osh-committee-members", authenticate, oshCommitteeMembersRoutes);
 
 // Admin-only (checked inside admin.js)
 app.use("/api/admin", adminRoutes);

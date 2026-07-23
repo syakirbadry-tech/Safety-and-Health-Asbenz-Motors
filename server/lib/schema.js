@@ -405,6 +405,67 @@ module.exports = {
     },
   },
 
+  // Corrective Actions/CAPA engine — presented in the UI as one register
+  // (Corrective Actions/CAPA, default view Corrective+Preventive; "All
+  // Actions" is the same register unfiltered). Source Module/Source
+  // Reference optionally trace back to whatever finding raised it, same
+  // free-text-pointer pattern as activityLog's recordRef.
+  actions: {
+    tableId: "tbl2W7hxGDHxx4qJB",
+    fields: {
+      actionReference: "fldpu4ohq1FsMS1Vd",
+      title: "fldWZnfCR1xzxfVbr",
+      description: "fldVejfKl7s3RlYaI",
+      dateRaised: "fldjZqQDjK95ZzTg2",
+      actionType: "fldXtXWOGhdOVGoTt",
+      priority: "fldfJAe76qG4hJ4nF",
+      status: "fldX1TFaK0jTfwuHB",
+      assignedTo: "fldQsu9UCyFiIxebz",
+      assignedDepartment: "fldGLR6ficXsPPZC6",
+      representation: "fldmeQvJtQpdnDEi5",
+      dueDate: "fldrjBZIov5mhv4OV",
+      completedDate: "fldMN94RgfOb4FKJc",
+      sourceModule: "fldACGmtr36AB1vjW",
+      sourceReference: "fldlmIdxh9dpGayJ8",
+      rootCause: "fldSaqoGyYxXGou2t",
+      measures: "fldkaoN3xy57vqL9e",
+      effectivenessReview: "fldpo8SRr5RZo4mLB",
+      verifiedEffective: "fldwHrkDeha8ieJ39",
+      evidence: "fldcMemMVPD61YhDp",
+      notes: "fldyafDz1nvhe2cP4",
+    },
+  },
+
+  oshCommitteeMeetings: {
+    tableId: "tbls4KSlOeefpCHBZ",
+    fields: {
+      meetingReference: "fldickz4PRwcv9rO3",
+      meetingDate: "fldZGpIXRoqoflszP",
+      meetingType: "fldI3X7axiHP8jFmz",
+      chairperson: "fld4osE8hthsTZuUs",
+      secretary: "fldohhPXTQKe39P5A",
+      attendees: "fldKKMGx2LH8Apdca",
+      agenda: "fld4PXKsNoVsvyda1",
+      keyDecisions: "fld7PMXsFHZa3KlZC",
+      minutes: "fld23dCRfWj7hDMkL",
+      nextMeetingDate: "fldTujGNnbaF7SVph",
+      status: "fld4WT2X077icEU2Q",
+    },
+  },
+
+  oshCommitteeMembers: {
+    tableId: "tblEXCXpB8Iqbf3Vw",
+    fields: {
+      memberName: "fldg0krOq6zyPsWNY",
+      position: "fldEhBz50mhciiTN6",
+      department: "fldIh01nYz89HlFDI",
+      termStart: "fldEV0IFHEqE7HWkq",
+      termEnd: "fldVv5QAq8Rsrb21w",
+      contact: "fld1lVjRvAtj24PSF",
+      status: "fldnK0oZmW78mfM1z",
+    },
+  },
+
   sop: {
     tableId: "tblweaJhQNRCOI9lc",
     fields: {

@@ -199,6 +199,44 @@ const MODULES = {
     complianceFieldId: "fld66TA1vtTz1vZ33",
     attachments: [{ key: "document", fieldId: "fldVSqjYdjVGkpzsl", label: "Document" }],
   },
+  // Corrective Actions/CAPA engine — see public/js/pages/actions.module.js
+  // for the register/filter/quick-filter UI built on top of this.
+  actions: {
+    key: "actions",
+    api: "/actions",
+    title: "Corrective Actions (CAPA)",
+    desc: "Corrective and preventive actions across every module",
+    icon: "checklist",
+    dateField: "Due Date",
+    primary: "Action Reference",
+    fields: {
+      "Action Reference": "fldpu4ohq1FsMS1Vd",
+      "Title": "fldWZnfCR1xzxfVbr",
+      "Description": "fldVejfKl7s3RlYaI",
+      "Date Raised": "fldjZqQDjK95ZzTg2",
+      "Action Type": "fldXtXWOGhdOVGoTt",
+      "Priority": "fldfJAe76qG4hJ4nF",
+      "Status": "fldX1TFaK0jTfwuHB",
+      "Assigned To": "fldQsu9UCyFiIxebz",
+      "Assigned Department": "fldGLR6ficXsPPZC6",
+      "Representation": "fldmeQvJtQpdnDEi5",
+      "Due Date": "fldrjBZIov5mhv4OV",
+      "Completed Date": "fldMN94RgfOb4FKJc",
+      "Source Module": "fldACGmtr36AB1vjW",
+      "Source Reference": "fldlmIdxh9dpGayJ8",
+      "Root Cause": "fldSaqoGyYxXGou2t",
+      "Corrective/Preventive Measures": "fldkaoN3xy57vqL9e",
+      "Effectiveness Review": "fldpo8SRr5RZo4mLB",
+      "Verified Effective": "fldwHrkDeha8ieJ39",
+      "Notes": "fldyafDz1nvhe2cP4",
+    },
+    dateKeys: ["Date Raised", "Due Date", "Completed Date"],
+    textareaKeys: ["Description", "Root Cause", "Corrective/Preventive Measures", "Effectiveness Review", "Notes"],
+    listColumns: ["Action Reference", "Title", "Action Type", "Status", "Due Date"],
+    complianceFieldId: null,
+    attachments: [{ key: "evidence", fieldId: "fldcMemMVPD61YhDp", label: "Evidence" }],
+  },
+
 };
 
 // ---------------------------------------------------------------------
@@ -241,6 +279,14 @@ const BUSINESS_MODULES = [
     route: "/operational-safety",
     ready: false,
     legacyKeys: ["hirarc", "sop"],
+  },
+  {
+    key: "capa",
+    title: "Corrective Actions (CAPA)",
+    desc: "Corrective and preventive actions across every module",
+    icon: "checklist",
+    route: "/capa",
+    ready: true,
   },
 ];
 
@@ -367,4 +413,5 @@ const ICONS = {
   doc: '<path d="M7 3h7l4 4v14H7V3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3v4h4M9.5 12h5M9.5 15.5h5" stroke="currentColor" stroke-width="1.4"/>',
   overview: '<path d="M4 19V5M4 19h16M8 19v-6m4 6v-9m4 9V8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
   admin: '<circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  checklist: '<rect x="4" y="3.5" width="16" height="17" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 8.5l1.3 1.3L11 7.5M7.5 14.5l1.3 1.3 2.2-2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 8.5h3M13.5 14.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
 };
