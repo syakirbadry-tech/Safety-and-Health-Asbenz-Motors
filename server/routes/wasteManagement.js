@@ -9,4 +9,5 @@ module.exports = buildModuleRouter({
   attachmentFields: {
     attachment: schema.wasteManagement.fields.attachment,
   },
+  eventPrefix: "Waste",
 });

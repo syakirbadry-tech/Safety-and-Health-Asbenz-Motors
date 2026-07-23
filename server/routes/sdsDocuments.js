@@ -4,6 +4,7 @@ const airtable = require("../lib/airtable");
 const { buildModuleRouter } = require("../lib/moduleRouter");
 const { writeRequiresAdmin } = require("../middleware/auth");
 const { logActivity } = require("../lib/activity");
+const eventBus = require("../lib/eventBus");
 
 // The versioned SDS Library. Records are never overwritten — a new SDS
 // revision for a chemical is always a new record. This router overrides
@@ -35,6 +36,7 @@ router.post("/", async (req, res) => {
           toSupersede.map((r) => ({ id: r.id, fields: { [F.status]: "Superseded" } })),
           true
         );
+        toSupersede.forEach((r) => eventBus.emit("SDS.RevisionSuperseded", { recordId: r.id, chemicalIds: r.fields[F.chemical] || [] }));
       }
     }
 
@@ -42,6 +44,7 @@ router.post("/", async (req, res) => {
     const created = result.records[0];
     const label = created.fields[F.sdsReference] || created.id;
     await logActivity({ userRecordId: req.user.sub, action: "Create", module: "SDS Documents", recordRef: label, req });
+    eventBus.emit("SDS.RevisionCreated", { recordId: created.id, chemicalIds: created.fields[F.chemical] || [], status: created.fields[F.status] });
     res.status(201).json({ record: created });
   } catch (err) {
     console.error(err);
@@ -59,6 +62,7 @@ router.use(
     attachmentFields: {
       file: schema.sdsDocuments.fields.sdsFile,
     },
+    eventPrefix: "SDS",
   })
 );
 

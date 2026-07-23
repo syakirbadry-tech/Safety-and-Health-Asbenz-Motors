@@ -15,6 +15,7 @@ const router = buildModuleRouter({
     sds: schema.chemicals.fields.sds,
     photos: schema.chemicals.fields.photos,
   },
+  eventPrefix: "Chemical",
 });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });

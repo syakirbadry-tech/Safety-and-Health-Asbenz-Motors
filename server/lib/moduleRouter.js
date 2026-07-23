@@ -7,10 +7,19 @@ const multer = require("multer");
 const airtable = require("./airtable");
 const { writeRequiresAdmin } = require("../middleware/auth");
 const { logActivity } = require("./activity");
+const eventBus = require("./eventBus");
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
-function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, primaryFieldKey }) {
+// eventPrefix is optional. When a module config passes it (e.g. "Chemical",
+// "Substance", "Waste"), create/update/delete/upload emit
+// "<eventPrefix>.Created" / ".Updated" / ".Deleted" / ".Uploaded" plus a
+// generic "Document.Uploaded" / "Document.Deleted" for any attachment field,
+// on the Event Bus (server/lib/eventBus.js) right after the Airtable call
+// succeeds — same place logActivity already fires, a second sink. When
+// eventPrefix is omitted (every module built before this existed), nothing
+// changes: no event fires, behavior is byte-for-byte the same as before.
+function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, primaryFieldKey, eventPrefix }) {
   const router = express.Router();
   router.use(writeRequiresAdmin);
 
@@ -46,6 +55,7 @@ function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, prim
       const created = result.records[0];
       const label = created.fields[fields[primaryFieldKey]] || created.id;
       await logActivity({ userRecordId: req.user.sub, action: "Create", module: moduleName, recordRef: label, req });
+      if (eventPrefix) eventBus.emit(`${eventPrefix}.Created`, { recordId: created.id, fields: created.fields, moduleName });
       res.status(201).json({ record: created });
     } catch (err) {
       console.error(err);
@@ -65,6 +75,7 @@ function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, prim
       const updated = result.records[0];
       const label = updated.fields[fields[primaryFieldKey]] || updated.id;
       await logActivity({ userRecordId: req.user.sub, action: "Update", module: moduleName, recordRef: label, req });
+      if (eventPrefix) eventBus.emit(`${eventPrefix}.Updated`, { recordId: updated.id, fields: updated.fields, moduleName });
       res.json({ record: updated });
     } catch (err) {
       console.error(err);
@@ -78,6 +89,7 @@ function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, prim
     try {
       await airtable.deleteRecords(tableId, [req.params.id]);
       await logActivity({ userRecordId: req.user.sub, action: "Delete", module: moduleName, recordRef: req.params.id, req });
+      if (eventPrefix) eventBus.emit(`${eventPrefix}.Deleted`, { recordId: req.params.id, moduleName });
       res.json({ ok: true });
     } catch (err) {
       console.error(err);
@@ -108,6 +120,8 @@ function buildModuleRouter({ moduleName, tableId, fields, attachmentFields, prim
         details: `${fieldKey}: ${req.file.originalname}`,
         req,
       });
+      if (eventPrefix) eventBus.emit(`${eventPrefix}.Uploaded`, { recordId: req.params.id, fieldKey, filename: req.file.originalname, moduleName });
+      eventBus.emit("Document.Uploaded", { recordId: req.params.id, moduleName, fieldKey, filename: req.file.originalname });
       res.json({ record: result });
     } catch (err) {
       console.error(err);

@@ -9,4 +9,5 @@ module.exports = buildModuleRouter({
   attachmentFields: {
     attachment: schema.exposureMonitoring.fields.attachment,
   },
+  eventPrefix: "ExposureMonitoring",
 });
