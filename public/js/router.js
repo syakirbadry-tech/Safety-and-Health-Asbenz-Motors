@@ -5,6 +5,17 @@
 const Router = (() => {
   const routes = [];
   let viewEl = null;
+  // Bumped on every render() call (direct load, click-nav, popstate — every
+  // path). A route's render function receives isCurrent(), a closure over
+  // the token it was handed; once a newer navigation bumps this counter,
+  // isCurrent() permanently returns false for the abandoned render. Promises
+  // can't be cancelled, so a slow-resolving fetch from a page the user has
+  // already left will still finish — this lets both the abandoned render's
+  // own code and the router's error handler recognize that and bail instead
+  // of writing stale content (or a stale error) over whatever is on screen
+  // now. Without this, an in-flight render from a page the user navigated
+  // away from can complete (or throw) later and clobber the current page.
+  let navGeneration = 0;
 
   function compile(pattern) {
     const keys = [];
@@ -63,14 +74,18 @@ const Router = (() => {
     highlightNav(path);
     window.scrollTo(0, 0);
 
+    const myGeneration = ++navGeneration;
+    const isCurrent = () => myGeneration === navGeneration;
+
     if (!found) {
       viewEl.innerHTML = `<div class="empty-state">Page not found. <a data-navigate="/" data-link>Back to Dashboard</a></div>`;
       return;
     }
     viewEl.innerHTML = `<div class="page-loading">Loading…</div>`;
     try {
-      await found.route.render(found.params, path);
+      await found.route.render(found.params, path, isCurrent);
     } catch (err) {
+      if (!isCurrent()) return; // a newer navigation already took over #view
       console.error("[router] render failed:", err);
       viewEl.innerHTML = `<div class="empty-state">Something went wrong loading this page.<br>${escapeHtml(err.message || "")}</div>`;
     }

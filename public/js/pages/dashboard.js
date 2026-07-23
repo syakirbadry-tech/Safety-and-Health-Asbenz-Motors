@@ -1,6 +1,6 @@
 // Top-level Dashboard — redesigned around business functions instead of
 // raw document tables. Registered against "/" and rendered by router.js.
-Router.register("/", async () => {
+Router.register("/", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
   const me = Auth.user();
   const isAdmin = me?.role === "Admin";
@@ -60,6 +60,7 @@ Router.register("/", async () => {
     }).length;
     const openCm = cm.filter((r) => r.fields[cmF.status] !== "Resolved").length;
 
+    if (!isCurrent()) return; // user navigated away while this was in flight
     kpiEl.innerHTML = Components.kpiRow([
       { label: "Registered Machines", value: machines.length, tone: "neutral", navigate: "/machinery/register" },
       { label: "CF Expiring/Expired (30d)", value: expiringCf, tone: expiringCf ? "warn" : "ok", navigate: "/machinery/register" },
@@ -67,6 +68,7 @@ Router.register("/", async () => {
       { label: "Preventive Maintenance Logged", value: pm.length, tone: "neutral", navigate: "/machinery/register" },
     ]);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     kpiEl.innerHTML = Components.emptyState("Could not load the compliance overview.");
   }
@@ -92,12 +94,14 @@ Router.register("/", async () => {
       return d !== null && d <= 30;
     }).length;
 
+    if (!isCurrent()) return;
     chemKpiEl.innerHTML = Components.kpiRow([
       { label: "Registered Chemicals", value: chemicals.length, tone: "neutral", navigate: "/chemical/register" },
       { label: "Expired SDS", value: expiredSds, tone: expiredSds ? "bad" : "ok", navigate: "/chemical/register" },
       { label: "Storage Inspections Due (30d)", value: storageDue, tone: storageDue ? "warn" : "ok", navigate: "/chemical/register" },
     ]);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     chemKpiEl.innerHTML = Components.emptyState("Could not load the Chemical Management overview.");
   }
@@ -117,6 +121,7 @@ Router.register("/", async () => {
     });
     const capaOpen = open.filter((r) => ["Corrective", "Preventive"].includes(r.fields[F["Action Type"]]));
 
+    if (!isCurrent()) return;
     actionsKpiEl.innerHTML = Components.kpiRow([
       { label: "Open Actions", value: open.length, tone: open.length ? "warn" : "ok", navigate: "/capa/register" },
       { label: "Overdue Actions", value: overdue.length, tone: overdue.length ? "bad" : "ok", navigate: "/capa/register" },
@@ -154,6 +159,7 @@ Router.register("/", async () => {
       });
     }
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     actionsKpiEl.innerHTML = Components.emptyState("Could not load the Corrective Actions overview.");
     openActionsEl.innerHTML = Components.emptyState("Could not load open actions.");
@@ -173,23 +179,28 @@ Router.register("/", async () => {
       .filter((r) => r.fields[meetingF.Status] === "Scheduled" && r.fields[meetingF["Meeting Date"]])
       .sort((a, b) => new Date(a.fields[meetingF["Meeting Date"]]) - new Date(b.fields[meetingF["Meeting Date"]]))[0];
 
+    if (!isCurrent()) return;
     committeeKpiEl.innerHTML = Components.kpiRow([
       { label: "Active Members", value: activeMembers, tone: "neutral", navigate: "/osh-committee/members" },
       { label: "Next Scheduled Meeting", value: upcoming ? fmtDate(upcoming.fields[meetingF["Meeting Date"]]) : "None", tone: upcoming ? "neutral" : "warn", navigate: "/osh-committee/register" },
     ]);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     committeeKpiEl.innerHTML = Components.emptyState("Could not load the OSH Committee overview.");
   }
 
+  if (!isCurrent()) return;
   const activityEl = document.getElementById("dashboardActivity");
   if (!isAdmin) {
     activityEl.innerHTML = Components.emptyState("Activity history is visible to Admins in the Admin panel.");
   } else {
     try {
       const data = await api("/admin/activity");
+      if (!isCurrent()) return;
       activityEl.innerHTML = Components.activityFeed(data.activity, { limit: 10 });
     } catch (err) {
+      if (!isCurrent()) return;
       console.error(err);
       activityEl.innerHTML = Components.emptyState("Could not load recent activity.");
     }

@@ -5,7 +5,7 @@
 // (every business surface gets a URL, not just a modal), reusing the
 // existing openRecordForm modal for add/edit — no new form code.
 
-Router.register("/osh-committee/members", async () => {
+Router.register("/osh-committee/members", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
 
@@ -31,9 +31,11 @@ Router.register("/osh-committee/members", async () => {
   let records = [];
   try {
     const data = await api("/osh-committee-members");
+    if (!isCurrent()) return;
     records = data.records || [];
     renderMembersTable(records);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     document.getElementById("membersTable").innerHTML = Components.emptyState("Could not load committee members.");
   }

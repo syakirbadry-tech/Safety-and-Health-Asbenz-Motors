@@ -979,7 +979,7 @@ const DOSH_GEN_FIELDS = {
   reviewedByTitle: "fldelgPkgOV0dFU7n",
 };
 
-Router.register("/chemical/dosh-register", async () => {
+Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
   view.innerHTML = `<div class="page-loading">Loading…</div>`;
@@ -988,10 +988,12 @@ Router.register("/chemical/dosh-register", async () => {
   try {
     data = await api("/chemicals/reports/dosh-register-data");
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     view.innerHTML = Components.emptyState("Could not load the DOSH register data.");
     return;
   }
+  if (!isCurrent()) return;
 
   view.innerHTML = `
     <div class="no-print">${Components.breadcrumb([

@@ -10,7 +10,7 @@
 // accordion section's HTML deferred until first expanded. No page reload
 // when switching chemicals; a button opens the existing full Profile page.
 
-Router.register("/chemical/cockpit", async () => {
+Router.register("/chemical/cockpit", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
   view.innerHTML = `
     ${Components.breadcrumb([
@@ -36,9 +36,11 @@ Router.register("/chemical/cockpit", async () => {
 
   try {
     const data = await api("/chemicals/reports/register-data");
+    if (!isCurrent()) return;
     rows = data.rows || [];
     renderList(rows);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     document.getElementById("cockpitList").innerHTML = Components.emptyState("Could not load the chemical register.");
     return;
@@ -72,6 +74,7 @@ Router.register("/chemical/cockpit", async () => {
     overviewEl.innerHTML = `<div class="page-loading">Loading…</div>`;
     try {
       const profile = await api(`/chemicals/${id}/profile`);
+      if (!isCurrent()) return;
       overviewEl.innerHTML = `
         <div class="flex gap-8" style="justify-content:space-between;align-items:center;margin-bottom:14px;">
           <h2 style="font-size:15px;margin:0;">${escapeHtml(profile.master.fields[MODULES.chemicals.fields["Product Name"]] || "—")}</h2>
@@ -83,6 +86,7 @@ Router.register("/chemical/cockpit", async () => {
         sections: cockpitSections(profile),
       });
     } catch (err) {
+      if (!isCurrent()) return;
       console.error(err);
       overviewEl.innerHTML = Components.emptyState("Could not load this chemical's overview.");
     }

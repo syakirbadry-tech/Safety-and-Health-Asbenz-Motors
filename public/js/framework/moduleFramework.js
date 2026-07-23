@@ -36,8 +36,8 @@ function defineBusinessModule(config) {
   FRAMEWORK_MODULE_BASE_PATHS[config.modulesKey] = config.basePath;
 
   Router.register(config.basePath, () => renderModuleDashboard(config));
-  Router.register(`${config.basePath}/register`, () => renderRegisterPage(config));
-  Router.register(`${config.basePath}/:id`, (params) => renderProfilePage(config, params));
+  Router.register(`${config.basePath}/register`, (params, path, isCurrent) => renderRegisterPage(config, isCurrent));
+  Router.register(`${config.basePath}/:id`, (params, path, isCurrent) => renderProfilePage(config, params, isCurrent));
 
   return config;
 }
@@ -167,12 +167,12 @@ function fw_subTableKpis(config, dataByKey, { overdue }) {
 // Register page — generic table of master records
 // ---------------------------------------------------------------------
 
-function renderRegisterPage(config) {
+function renderRegisterPage(config, isCurrent) {
   // registerFilters: opt-in Filter/Search/Quick-Filter/Export toolbar over a
   // pre-enriched data endpoint (avoids an N+1 fetch for derived columns) —
   // generic primitive, wired up for Chemical Management first (see
   // chemical.module.js), reusable by any future module the same way.
-  if (config.registerFilters) return renderFwRegisterFiltersPage(config);
+  if (config.registerFilters) return renderFwRegisterFiltersPage(config, isCurrent);
 
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
@@ -189,10 +189,20 @@ function renderRegisterPage(config) {
     document.getElementById("fwAddBtn").addEventListener("click", () => fw_triggerAdd(config));
   }
 
+  // Register pages across every module share the same element ids
+  // (fwRegisterTable etc.) — without the isCurrent guard, a slow list()
+  // resolving after the user has already navigated to a *different*
+  // module's register page would silently write this module's rows into
+  // that page's table (or, if the page underneath isn't a register page at
+  // all, throw on a missing element).
   config._services.master
     .list()
-    .then((records) => renderFwRegisterTable(config, records))
+    .then((records) => {
+      if (!isCurrent()) return;
+      renderFwRegisterTable(config, records);
+    })
     .catch((err) => {
+      if (!isCurrent()) return;
       console.error(err);
       document.getElementById("fwRegisterTable").innerHTML = Components.emptyState(`Could not load ${config.title.toLowerCase()}.`);
     });
@@ -209,7 +219,7 @@ function renderRegisterPage(config) {
 //   quickFilters  -> [{ key, label, predicate(row) }], first entry is the default
 // ---------------------------------------------------------------------
 
-function renderFwRegisterFiltersPage(config) {
+function renderFwRegisterFiltersPage(config, isCurrent) {
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
   const rf = config.registerFilters;
@@ -223,10 +233,12 @@ function renderFwRegisterFiltersPage(config) {
 
   api(rf.dataEndpoint)
     .then((data) => {
+      if (!isCurrent()) return;
       const rows = data[rf.rowsKey || "rows"] || [];
       mountFwRegisterFilters(config, rows);
     })
     .catch((err) => {
+      if (!isCurrent()) return;
       console.error(err);
       document.getElementById("fwFilterToolbar").innerHTML = "";
       document.getElementById("fwRegisterTable").innerHTML = Components.emptyState(`Could not load ${config.title.toLowerCase()}.`);
@@ -587,7 +599,7 @@ async function renderFwReportsTab(config) {
 // tab per sub-table + Photos + Attachments + Risk + Activity Timeline
 // ---------------------------------------------------------------------
 
-async function renderProfilePage(config, params) {
+async function renderProfilePage(config, params, isCurrent) {
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
 
@@ -595,10 +607,12 @@ async function renderProfilePage(config, params) {
   try {
     profile = await config._services.master.getProfile(params.id);
   } catch (err) {
+    if (!isCurrent()) return;
     console.error(err);
     view.innerHTML = Components.emptyState(`${config.parentLabel} not found, or it may have been deleted.`);
     return;
   }
+  if (!isCurrent()) return; // user navigated away while the profile fetch was in flight
 
   const nameField = fw_masterField(config, config.nameField);
   const record = profile.master;
