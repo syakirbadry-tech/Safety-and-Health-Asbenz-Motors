@@ -51,6 +51,48 @@ function sdsExpiryStatus(expiryDateStr) {
   return "Current";
 }
 
+// Every attachment field that can hold a document for a chemical, across the
+// master record and every linked sub-table — the data source for the
+// centralized Documents tab (moduleFramework's documents: { mode:
+// "aggregated" }). Nothing is re-uploaded or duplicated here: files stay
+// attached to their original record/field, this only flattens references.
+function buildDocumentsList(master, subTables) {
+  const docs = [];
+  const CF = schema.chemicals.fields;
+
+  function addFrom(records, fieldId, sourceModule, sourceLabel, primaryFieldId) {
+    (records || []).forEach((r) => {
+      (r.fields[fieldId] || []).forEach((att) => {
+        docs.push({
+          id: att.id,
+          filename: att.filename,
+          url: att.url,
+          size: att.size,
+          contentType: att.type,
+          sourceModule,
+          sourceLabel,
+          sourceRecordId: r.id,
+          sourceRecordLabel: primaryFieldId ? r.fields[primaryFieldId] || r.id : r.id,
+          uploadedTime: r.createdTime,
+        });
+      });
+    });
+  }
+
+  addFrom([master], CF.sds, "Chemical", "SDS (legacy field)");
+  addFrom([master], CF.photos, "Chemical", "Photos");
+  addFrom(subTables.sdsDocuments, schema.sdsDocuments.fields.sdsFile, "SDS", "SDS File", schema.sdsDocuments.fields.sdsReference);
+  addFrom(subTables.storageInspection, schema.chemicalStorageInspection.fields.attachment, "Storage Inspection", "Attachment", schema.chemicalStorageInspection.fields.inspectionReference);
+  addFrom(subTables.labelInspection, schema.chemicalLabelInspection.fields.attachment, "Label Inspection", "Photo", schema.chemicalLabelInspection.fields.inspectionReference);
+  addFrom(subTables.wasteManagement, schema.wasteManagement.fields.manifest, "Waste Management", "Consignment Note", schema.wasteManagement.fields.disposalReference);
+  addFrom(subTables.wasteManagement, schema.wasteManagement.fields.disposalCertificate, "Waste Management", "Disposal Certificate", schema.wasteManagement.fields.disposalReference);
+  addFrom(subTables.training, schema.chemicalSafetyTraining.fields.attachment, "Training", "Certificate", schema.chemicalSafetyTraining.fields.trainingReference);
+  addFrom(subTables.chra, schema.chra.fields.document, "CHRA", "Report", schema.chra.fields.referenceNo);
+  addFrom(subTables.chra, schema.chra.fields.sds, "CHRA", "SDS Attachment", schema.chra.fields.referenceNo);
+
+  return docs;
+}
+
 function pickCurrentSds(sdsDocumentsRecords) {
   const SF = schema.sdsDocuments.fields;
   const current = (sdsDocumentsRecords || []).filter((r) => r.fields[SF.status] === "Current");
@@ -92,8 +134,8 @@ function buildGeneralInfoDerived(subTables) {
 // chemical.module.js config expects: exposureMonitoring, storageInspection,
 // labelInspection, wasteManagement, sdsDocuments, training, chra (CHRA reused
 // as the risk-assessment tab, same pattern as HIRARC for Machinery),
-// substances (Section 3 ingredients). postProcess attaches complianceSummary
-// and generalInfo (derived) — see helpers above.
+// substances (Section 3 ingredients). postProcess attaches complianceSummary,
+// documents (aggregated) and generalInfo (derived) — see helpers above.
 router.get(
   "/:id/profile",
   buildProfileRoute({
@@ -113,6 +155,7 @@ router.get(
     ],
     postProcess: (result, master) => {
       result.complianceSummary = buildComplianceSummary(master, result.subTables);
+      result.documents = buildDocumentsList(master, result.subTables);
       result.generalInfo = buildGeneralInfoDerived(result.subTables);
     },
   })

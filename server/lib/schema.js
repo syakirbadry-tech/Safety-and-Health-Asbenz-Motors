@@ -346,12 +346,14 @@ module.exports = {
     fields: {
       disposalReference: "fldZoHsavHsEBjK1o",
       chemical: "fldwAfS67lDi52uDh",
-      wasteType: "fldVhZ33qz5Pa4sbT",
+      wasteType: "fldVhZ33qz5Pa4sbT", // display name "Waste Category"
       disposalDate: "fldbyZrZPk8NReZae",
       disposalMethod: "fldzou44acRxktqfU",
-      contractor: "fldEi3MaVDPBUMRPr",
+      contractor: "fldEi3MaVDPBUMRPr", // display name "Licensed Contractor"
       quantity: "fldNr9HjzzSaysYsP",
-      manifest: "fld32wouY65NYZP22",
+      manifest: "fld32wouY65NYZP22", // display name "Consignment Note"
+      scheduledWasteCode: "fldhtiszeyC30vu2G",
+      disposalCertificate: "fldVPL9B1NCJ2xsnW",
     },
   },
 

@@ -249,14 +249,22 @@ const CHEMICAL_MODULE = defineBusinessModule({
         contractor: "fldEi3MaVDPBUMRPr",
         quantity: "fldNr9HjzzSaysYsP",
         manifest: "fld32wouY65NYZP22",
+        scheduledWasteCode: "fldhtiszeyC30vu2G",
+        disposalCertificate: "fldVPL9B1NCJ2xsnW",
       },
       formMeta: {
-        labels: { disposalReference: "Disposal Reference", wasteType: "Waste Type", disposalDate: "Disposal Date", disposalMethod: "Disposal Method", contractor: "Contractor", quantity: "Quantity" },
+        labels: { disposalReference: "Disposal Reference", wasteType: "Waste Category", scheduledWasteCode: "Scheduled Waste Code", disposalDate: "Disposal Date", disposalMethod: "Disposal Method", contractor: "Licensed Contractor", quantity: "Quantity" },
         dateKeys: ["disposalDate"],
         selectOptions: {},
         textareaKeys: [],
-        attachmentKey: "manifest",
-        attachmentLabel: "Manifest",
+        // Two independently-uploadable files (moduleFramework.js's
+        // fw_attachmentConfigs) — a Waste Disposal record needs both the
+        // Consignment Note and, once the contractor issues it, a separate
+        // Disposal Certificate.
+        attachments: [
+          { key: "manifest", label: "Consignment Note" },
+          { key: "disposalCertificate", label: "Disposal Certificate" },
+        ],
       },
       listColumns: ["wasteType", "disposalDate"],
       countLabel: "Waste Disposals Logged",
@@ -333,14 +341,16 @@ const CHEMICAL_MODULE = defineBusinessModule({
     selectFields: ["complianceStatus"],
   },
 
-  photos: { fieldKey: "Photos", uploadKey: "photos" },
-
-  // The real, versioned SDS Library is the sdsDocuments sub-table above now.
-  // This stays as a plain "Attachments" view of the master record's own
-  // attachment fields (the original SDS field kept for backward
-  // compatibility, plus Photos) — same role Machinery's Documents tab plays.
+  // v2.0: the Profile page's Photos + Attachments tabs are replaced by one
+  // aggregated Documents tab (mode: "aggregated", sourced from postProcess's
+  // profile.documents — see chemicals.js). `fields` is kept only for the
+  // Module Dashboard's cross-chemical Documents tab (renderFwDocumentsTab in
+  // moduleFramework.js), which still uses the legacy per-field shape since
+  // aggregating every chemical's full sub-table documents there would be an
+  // expensive fetch — open a specific chemical's profile for its full list.
   documents: {
-    label: "Attachments",
+    label: "Documents",
+    mode: "aggregated",
     fields: [
       { label: "SDS (legacy field)", key: "SDS" },
       { label: "Photos", key: "Photos" },

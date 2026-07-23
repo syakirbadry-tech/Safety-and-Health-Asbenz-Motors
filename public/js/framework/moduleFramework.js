@@ -640,8 +640,17 @@ async function renderProfilePage(config, params) {
       render: () => renderFwProfileSubTable(config, t.subKey, profile.subTables[t.subKey], t.emptyNoun, record),
       afterRender: bindSubHandlers,
     })),
-    ...(config.photos ? [{ key: "photos", label: "Photos", render: () => renderFwPhotosTab(config, record), afterRender: (el) => bindFwPhotoUpload(config, el, record.id) }] : []),
-    { key: "attachments", label: "Attachments", render: () => renderFwAttachmentsTab(config, record) },
+    // documents.mode === "aggregated": one "Documents" tab sourced from
+    // profile.documents (computed server-side by a module's postProcess
+    // hook — see profileAggregation.js), replacing the separate Photos +
+    // Attachments tabs entirely (nothing is deleted from Airtable, just
+    // surfaced together). Every other module keeps the original two tabs.
+    ...(config.documents && config.documents.mode === "aggregated"
+      ? [{ key: "documents", label: config.documents.label || "Documents", render: () => renderFwAggregatedDocumentsTab(profile.documents || []) }]
+      : [
+          ...(config.photos ? [{ key: "photos", label: "Photos", render: () => renderFwPhotosTab(config, record), afterRender: (el) => bindFwPhotoUpload(config, el, record.id) }] : []),
+          { key: "attachments", label: "Attachments", render: () => renderFwAttachmentsTab(config, record) },
+        ]),
     ...(config.riskAssessment
       ? [{ key: "risk", label: config.riskAssessment.label, render: () => renderFwProfileRiskTab(config, profile.subTables[config.riskAssessment.profileSourceKey]) }]
       : []),
@@ -745,6 +754,33 @@ function renderFwProfileSubTable(config, subKey, records, emptyNoun, masterRecor
   const columns = fw_subTableColumns(config, subKey, { withParent: false });
   const rows = records.map((r) => fw_subTableRow(config, subKey, r, { withParent: false, openOnClick: true }));
   return header + actions + Components.dataTable({ columns, rows, emptyLabel: `No ${emptyNoun} recorded yet.` });
+}
+
+// Aggregated Documents tab (documents.mode === "aggregated") — renders the
+// flattened cross-sub-table document list a module's postProcess hook
+// computed (profile.documents), grouped by nothing in particular, newest
+// first. Read-only: uploads/replacements happen from each document's own
+// source tab, same as the legacy Attachments tab's note used to say.
+function renderFwAggregatedDocumentsTab(documents) {
+  const sorted = (documents || []).slice().sort((a, b) => new Date(b.uploadedTime || 0) - new Date(a.uploadedTime || 0));
+  const rows = sorted.map((d) => ({
+    cells: {
+      source: `<strong>${escapeHtml(d.sourceModule)}</strong><div class="text-dim" style="font-size:11.5px;">${escapeHtml(d.sourceRecordLabel || "")}</div>`,
+      type: escapeHtml(d.sourceLabel || "—"),
+      file: `<a href="${d.url}" target="_blank" rel="noopener">${escapeHtml(d.filename || "file")}</a>`,
+      uploaded: fmtDate(d.uploadedTime),
+    },
+  }));
+  return Components.dataTable({
+    columns: [
+      { key: "source", label: "Source" },
+      { key: "type", label: "Document Type" },
+      { key: "file", label: "File" },
+      { key: "uploaded", label: "Uploaded" },
+    ],
+    rows,
+    emptyLabel: "No documents uploaded yet.",
+  });
 }
 
 function renderFwPhotosTab(config, record) {
