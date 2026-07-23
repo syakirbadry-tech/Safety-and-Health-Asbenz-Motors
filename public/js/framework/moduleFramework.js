@@ -900,9 +900,22 @@ function openSubRecordForm(config, subKey, parentId, record) {
     })
     .join("");
 
-  const attachmentHtml = record
-    ? fw_subRecordAttachmentHtml(config, subKey, record, isAdmin)
-    : `<p class="text-dim" style="font-size:12.5px;">Save this record first, then you can upload a file.</p>`;
+  // Every attachment field a sub-table's formMeta declares gets its own
+  // upload section — meta.attachments: [{ key, label }, ...] for a
+  // sub-table with more than one (e.g. Waste Management's Consignment Note
+  // + Disposal Certificate), or the original singular attachmentKey/
+  // attachmentLabel for everything else, unchanged.
+  const attachmentConfigs = fw_attachmentConfigs(meta);
+  const attachmentSections = record
+    ? attachmentConfigs
+        .map(
+          (ac) => `
+          <div class="section-head" style="margin-top:8px;"><h2 style="font-size:14px;">${escapeHtml(ac.label)}</h2></div>
+          <div class="record-list">${fw_subRecordAttachmentHtml(config, subKey, record, isAdmin, ac.key)}</div>`
+        )
+        .join("")
+    : `<div class="section-head" style="margin-top:8px;"><h2 style="font-size:14px;">${escapeHtml(attachmentConfigs[0]?.label || "Attachments")}</h2></div>
+       <p class="text-dim" style="font-size:12.5px;">Save this record first, then you can upload a file.</p>`;
 
   modalBody.innerHTML = `
     <form id="fwSubRecordForm">
@@ -913,8 +926,7 @@ function openSubRecordForm(config, subKey, parentId, record) {
         <button type="button" class="btn ghost" id="fwSubBackBtn">Close</button>
       </div>
     </form>
-    <div class="section-head" style="margin-top:8px;"><h2 style="font-size:14px;">${escapeHtml(meta.attachmentLabel)}</h2></div>
-    <div class="record-list">${attachmentHtml}</div>
+    ${attachmentSections}
   `;
 
   document.getElementById("fwSubBackBtn").addEventListener("click", closeModal);
@@ -962,9 +974,20 @@ function openSubRecordForm(config, subKey, parentId, record) {
   overlay.classList.add("open");
 }
 
-function fw_subRecordAttachmentHtml(config, subKey, record, isAdmin) {
+// Normalizes a sub-table's attachment config to a list: meta.attachments
+// (new, for sub-tables with more than one uploadable field) if present,
+// otherwise the original singular attachmentKey/attachmentLabel wrapped in
+// a one-element array — every existing sub-table config keeps working
+// unchanged.
+function fw_attachmentConfigs(meta) {
+  if (meta.attachments) return meta.attachments;
+  if (meta.attachmentKey) return [{ key: meta.attachmentKey, label: meta.attachmentLabel }];
+  return [];
+}
+
+function fw_subRecordAttachmentHtml(config, subKey, record, isAdmin, attachmentKey) {
   const st = config.subTables[subKey];
-  const fieldId = st.fields[st.formMeta.attachmentKey];
+  const fieldId = st.fields[attachmentKey];
   const files = record.fields[fieldId] || [];
   const chips = files.length
     ? files.map((f) => `<a class="file-chip" href="${f.url}" target="_blank" rel="noopener">\u{1F4CE} ${escapeHtml(f.filename)}</a>`).join("")
@@ -972,7 +995,7 @@ function fw_subRecordAttachmentHtml(config, subKey, record, isAdmin) {
   return `
     <div class="record-row">
       <div><div class="meta flex gap-8 flex-wrap">${chips}</div></div>
-      ${isAdmin ? `<div class="actions"><label class="btn small">Upload<input type="file" style="display:none" data-fw-sub-upload="${config.key}:${subKey}:${record.id}:${st.formMeta.attachmentKey}" /></label></div>` : ""}
+      ${isAdmin ? `<div class="actions"><label class="btn small">Upload<input type="file" style="display:none" data-fw-sub-upload="${config.key}:${subKey}:${record.id}:${attachmentKey}" /></label></div>` : ""}
     </div>`;
 }
 
