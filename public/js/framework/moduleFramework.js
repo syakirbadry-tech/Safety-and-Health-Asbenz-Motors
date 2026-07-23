@@ -634,12 +634,17 @@ async function renderProfilePage(config, params) {
     ...(config.historyTab
       ? [{ key: config.historyTab.key, label: config.historyTab.label, render: () => renderFwHistoryTab(config, profile), afterRender: bindSubHandlers }]
       : []),
-    ...config.profileSubTabs.map((t) => ({
-      key: t.tabKey,
-      label: t.label,
-      render: () => renderFwProfileSubTable(config, t.subKey, profile.subTables[t.subKey], t.emptyNoun, record),
-      afterRender: bindSubHandlers,
-    })),
+    // t.condition(record), if set, hides a sub-table tab unless the master
+    // record says it applies — e.g. Chemical Management's Exposure
+    // Monitoring tab only shows when "Exposure Monitoring Required" = Yes.
+    ...config.profileSubTabs
+      .filter((t) => !t.condition || t.condition(record))
+      .map((t) => ({
+        key: t.tabKey,
+        label: t.label,
+        render: () => renderFwProfileSubTable(config, t.subKey, profile.subTables[t.subKey], t.emptyNoun, record),
+        afterRender: bindSubHandlers,
+      })),
     // documents.mode === "aggregated": one "Documents" tab sourced from
     // profile.documents (computed server-side by a module's postProcess
     // hook — see profileAggregation.js), replacing the separate Photos +
@@ -654,6 +659,14 @@ async function renderProfilePage(config, params) {
     ...(config.riskAssessment
       ? [{ key: "risk", label: config.riskAssessment.label, render: () => renderFwProfileRiskTab(config, profile.subTables[config.riskAssessment.profileSourceKey]) }]
       : []),
+    // Bespoke tabs that don't fit the generic sub-table shape, scoped to the
+    // Profile page (the historyTab/extraDashboardTabs sibling for the Module
+    // Dashboard) — e.g. Chemical Management's LEV/Biological
+    // Monitoring/Health Surveillance placeholders, each gated by its own
+    // condition(record) the same way profileSubTabs entries are.
+    ...(config.extraProfileTabs || [])
+      .filter((t) => !t.condition || t.condition(record))
+      .map((t) => ({ key: t.key, label: t.label, render: () => t.render(record, profile), afterRender: bindSubHandlers })),
     { key: "activity", label: "Activity Timeline", render: () => renderFwActivityTab(profile.activity) },
   ];
 

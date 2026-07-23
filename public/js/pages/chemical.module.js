@@ -357,6 +357,40 @@ const CHEMICAL_MODULE = defineBusinessModule({
     ],
   },
 
+  // Conditional modules (v2.0): grouped together after CHRA on the Profile
+  // page, each gated by its own assessor-set "<X> Required" flag on
+  // Chemicals (manual, not AI-inferred — see PROJECT_ROADMAP.md /
+  // MEMORY.md decision). Exposure Monitoring already has a real sub-table;
+  // LEV/Biological Monitoring/Health Surveillance don't exist yet (future
+  // milestones per ARCHITECTURE.md) — their tabs render a short placeholder
+  // so the module is future-ready without a redesign, per the brief.
+  extraProfileTabs: [
+    {
+      key: "exposure",
+      label: "Exposure Monitoring",
+      condition: (record) => record.fields[MODULES.chemicals.fields["Exposure Monitoring Required"]] === "Yes",
+      render: (record, profile) => renderFwProfileSubTable(CHEMICAL_MODULE, "exposureMonitoring", profile.subTables.exposureMonitoring, "exposure monitoring records", record),
+    },
+    {
+      key: "lev",
+      label: "LEV",
+      condition: (record) => record.fields[MODULES.chemicals.fields["LEV Required"]] === "Yes",
+      render: () => conditionalModulePlaceholder("Local Exhaust Ventilation (LEV)"),
+    },
+    {
+      key: "biological",
+      label: "Biological Monitoring",
+      condition: (record) => record.fields[MODULES.chemicals.fields["Biological Monitoring Required"]] === "Yes",
+      render: () => conditionalModulePlaceholder("Biological Monitoring"),
+    },
+    {
+      key: "healthSurveillance",
+      label: "Health Surveillance",
+      condition: (record) => record.fields[MODULES.chemicals.fields["Health Surveillance Required"]] === "Yes",
+      render: () => conditionalModulePlaceholder("Health Surveillance"),
+    },
+  ],
+
   attachmentsNote: 'To upload or replace files, use "Edit / Manage Files" above, or manage SDS revisions from the SDS tab.',
 
   // Register page Filter/Search/Quick-Filter/Export toolbar (v2.0), powered
