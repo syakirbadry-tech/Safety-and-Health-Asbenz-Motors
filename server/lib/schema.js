@@ -345,6 +345,22 @@ module.exports = {
     },
   },
 
+  aiExtractionLogs: {
+    tableId: "tblUMGNzooVEfr5gE",
+    fields: {
+      logReference: "fld6Bu3RhJFk7WIzJ",
+      extractionType: "fldk5DLTgjROBHQ6p",
+      modelUsed: "fldVgcvwLasc4QXuD",
+      promptVersion: "fldTdvKTQiu9tfhWL",
+      extractionVersion: "fldn76FccNKSM9gy5",
+      timestamp: "fldSVPEvlq7pOGQLc",
+      durationMs: "fldNDagTQi2c3Xy4h",
+      success: "fldFfX1AoXkzwaDZj",
+      warnings: "fldESqkCocVYDAjZz",
+      recordRef: "fld4Nas1N5Ip99yIM",
+    },
+  },
+
   sop: {
     tableId: "tblweaJhQNRCOI9lc",
     fields: {

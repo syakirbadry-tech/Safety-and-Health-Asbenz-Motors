@@ -6,10 +6,17 @@
 // public/js/app.js: applyAiSuggestion).
 
 const fetch = require("node-fetch");
+const { logAiExtraction } = require("./aiExtractionLog");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 console.log(`Using Gemini model: ${MODEL}`);
+
+// Bumped whenever EXTRACTION_PROMPT/SDS_EXTRACTION_PROMPT or their response
+// schemas change shape — lets AI Extraction Logs correlate a run's output
+// quality with the exact prompt that produced it.
+const LICENSE_PROMPT_VERSION = "license-v1";
+const SDS_PROMPT_VERSION = "sds-v1";
 
 console.log({
   model: MODEL,
@@ -39,6 +46,33 @@ const RESPONSE_SCHEMA = {
 };
 
 async function extractLicenseData({ base64, mimeType }) {
+  const startedAt = Date.now();
+  try {
+    const result = await runLicenseExtraction({ base64, mimeType });
+    await logAiExtraction({
+      extractionType: "License",
+      model: MODEL,
+      promptVersion: LICENSE_PROMPT_VERSION,
+      extractionVersion: LICENSE_PROMPT_VERSION,
+      durationMs: Date.now() - startedAt,
+      success: true,
+    });
+    return result;
+  } catch (err) {
+    await logAiExtraction({
+      extractionType: "License",
+      model: MODEL,
+      promptVersion: LICENSE_PROMPT_VERSION,
+      extractionVersion: LICENSE_PROMPT_VERSION,
+      durationMs: Date.now() - startedAt,
+      success: false,
+      warnings: err.message,
+    });
+    throw err;
+  }
+}
+
+async function runLicenseExtraction({ base64, mimeType }) {
   if (!GEMINI_API_KEY) {
     const err = new Error(
       "AI extraction isn't set up yet — add GEMINI_API_KEY to your .env file to enable it."
@@ -160,6 +194,33 @@ const SDS_RESPONSE_SCHEMA = {
 };
 
 async function extractSDSData({ base64, mimeType }) {
+  const startedAt = Date.now();
+  try {
+    const result = await runSDSExtraction({ base64, mimeType });
+    await logAiExtraction({
+      extractionType: "SDS",
+      model: MODEL,
+      promptVersion: SDS_PROMPT_VERSION,
+      extractionVersion: SDS_PROMPT_VERSION,
+      durationMs: Date.now() - startedAt,
+      success: true,
+    });
+    return result;
+  } catch (err) {
+    await logAiExtraction({
+      extractionType: "SDS",
+      model: MODEL,
+      promptVersion: SDS_PROMPT_VERSION,
+      extractionVersion: SDS_PROMPT_VERSION,
+      durationMs: Date.now() - startedAt,
+      success: false,
+      warnings: err.message,
+    });
+    throw err;
+  }
+}
+
+async function runSDSExtraction({ base64, mimeType }) {
   if (!GEMINI_API_KEY) {
     const err = new Error(
       "AI extraction isn't set up yet — add GEMINI_API_KEY to your .env file to enable it."
