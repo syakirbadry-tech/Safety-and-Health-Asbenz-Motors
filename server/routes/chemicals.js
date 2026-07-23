@@ -118,6 +118,59 @@ router.get(
   })
 );
 
+// GET /reports/register-data — one aggregated call for the Register page,
+// its Filter/Search/Quick-Filter toolbar, and the Master-Detail Cockpit's
+// left pane: every chemical plus derived fields (Manufacturer, Physical
+// Form, time-based SDS status, current-SDS record id for the "View SDS"
+// click) — same aggregation style as /reports/dosh-register-data below,
+// avoiding an N+1 fetch in the browser.
+//
+// Must be a 2+ segment path, not "/register-data" — buildModuleRouter above
+// already registered GET "/:id", which (being a single path segment) would
+// shadow a single-segment GET registered after it, since Express matches in
+// registration order. Same trap /reports/dosh-register-data documents below.
+router.get("/reports/register-data", async (req, res) => {
+  try {
+    const CF = schema.chemicals.fields;
+    const SF = schema.sdsDocuments.fields;
+
+    const [chemicals, sdsDocs] = await Promise.all([
+      airtable.listRecords(schema.chemicals.tableId),
+      airtable.listRecords(schema.sdsDocuments.tableId),
+    ]);
+
+    const sdsByChemical = {};
+    sdsDocs.forEach((r) => {
+      (r.fields[SF.chemical] || []).forEach((id) => {
+        if (!sdsByChemical[id]) sdsByChemical[id] = [];
+        sdsByChemical[id].push(r);
+      });
+    });
+
+    const rows = chemicals.map((r) => {
+      const currentSds = pickCurrentSds(sdsByChemical[r.id]);
+      return {
+        id: r.id,
+        productName: r.fields[CF.chemicalName] || "",
+        productCode: r.fields[CF.internalCode] || "",
+        casNumber: r.fields[CF.casNumber] || "",
+        supplier: r.fields[CF.supplier] || "",
+        manufacturer: currentSds?.fields[SF.manufacturer] || "",
+        storageLocation: r.fields[CF.storageLocation] || "",
+        hazardClassification: r.fields[CF.hazardClassification] || "",
+        physicalForm: currentSds?.fields[SF.physicalForm] || "",
+        currentSdsId: currentSds?.id || null,
+        sdsStatus: currentSds ? sdsExpiryStatus(currentSds.fields[SF.expiryDate]) : "Missing",
+      };
+    });
+
+    res.json({ rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not load chemical register data." });
+  }
+});
+
 // GET /reports/dosh-register-data — read-only aggregation for the generated
 // DOSH Chemical Register report (public/js/pages/chemical.module.js's
 // /chemical/dosh-register page). Section A = first Company Settings record;

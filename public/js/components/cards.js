@@ -9,8 +9,14 @@ var Components = window.Components || {};
 
 const TONE_VAR = { ok: "var(--green)", warn: "var(--amber)", bad: "var(--red)", neutral: "var(--gray)" };
 
-Components.kpiCard = ({ label, value, tone = "neutral" }) => `
-  <div class="stat-card" style="border-color:${TONE_VAR[tone] || TONE_VAR.neutral}">
+// tabKey: clicking the card switches to that tab within the same mountTabs
+// instance (Module Dashboard's Overview/Reports -> its own sub-table tabs).
+// navigate: clicking the card routes to a different page/URL entirely (e.g.
+// "Registered Chemicals" -> the Chemical Register page). At most one of the
+// two makes sense per card; a card with neither stays inert, as before.
+Components.kpiCard = ({ label, value, tone = "neutral", tabKey, navigate }) => `
+  <div class="stat-card${tabKey || navigate ? " kpi-clickable" : ""}" style="border-color:${TONE_VAR[tone] || TONE_VAR.neutral}"
+    ${tabKey ? `data-kpi-tab="${tabKey}"` : ""}${navigate ? ` data-navigate="${navigate}"` : ""}>
     <div class="n">${value}</div>
     <div class="l">${escapeHtml(label)}</div>
   </div>`;

@@ -322,6 +322,7 @@ module.exports = {
       findings: "fldm8ZfahbTBnbXE6",
       nextDue: "fldaYJIQ8WVdpTLGz",
       attachment: "fldYX4eQQY6hzvwgo",
+      correctiveAction: "fldmUrQ0IqQj1fjMx",
     },
   },
 
@@ -334,7 +335,9 @@ module.exports = {
       inspector: "fld6tJcHhEkIEKmi0",
       compliant: "fldnlw583dIy1fUP4",
       findings: "fldPfX76lW9DvF2C3",
-      attachment: "fldXLfTa1RqXsrdIm",
+      attachment: "fldXLfTa1RqXsrdIm", // multi-file: used as a Photos gallery
+      labelCondition: "fldBrZ7jWytx7DDPT",
+      correctiveAction: "fldFAxTebdyIjNHAm",
     },
   },
 

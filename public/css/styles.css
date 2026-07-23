@@ -157,6 +157,8 @@ main.content .page{max-width:1180px;margin:0 auto;padding:36px clamp(16px,4vw,32
 .stat-card{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:16px;}
 .stat-card .n{font:700 26px 'PT Serif',serif;color:var(--text-strong);}
 .stat-card .l{font-size:11.5px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.03em;}
+.kpi-clickable{cursor:pointer;transition:border-color .15s,transform .1s;}
+.kpi-clickable:hover{border-left-color:var(--accent-strong,var(--accent));transform:translateY(-1px);}
 
 /* ---------- Buttons ---------- */
 .btn{
@@ -266,6 +268,26 @@ tr.row-click:hover td{background:var(--panel-2);}
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border-soft);margin-bottom:18px;overflow-x:auto;}
 .tab{padding:10px 4px;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;background:none;border-left:none;border-right:none;border-top:none;font-family:inherit;}
 .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+
+/* ---------- Accordion (Master-Detail Cockpit overview panel) ---------- */
+.accordion{display:flex;flex-direction:column;gap:8px;}
+.accordion-section{border:1px solid var(--border-soft);border-radius:var(--radius);overflow:hidden;}
+.accordion-header{width:100%;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--panel);border:none;cursor:pointer;font:600 13px inherit;color:var(--text);text-align:left;}
+.accordion-header:hover{background:var(--panel-hover,var(--panel));}
+.accordion-caret{transition:transform .15s;color:var(--muted);}
+.accordion-section.open .accordion-caret{transform:rotate(180deg);}
+.accordion-body{padding:0 14px 14px;}
+
+/* ---------- Master-Detail Cockpit ---------- */
+.cockpit-layout{display:grid;grid-template-columns:340px 1fr;gap:18px;align-items:start;}
+.cockpit-list{max-height:calc(100vh - 220px);overflow-y:auto;border:1px solid var(--border-soft);border-radius:var(--radius);}
+.cockpit-list-item{padding:10px 14px;border-bottom:1px solid var(--border-soft);cursor:pointer;font-size:13px;}
+.cockpit-list-item:last-child{border-bottom:none;}
+.cockpit-list-item:hover{background:var(--panel);}
+.cockpit-list-item.active{background:var(--panel);border-left:3px solid var(--accent);}
+.cockpit-list-item .meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.cockpit-overview{border:1px solid var(--border-soft);border-radius:var(--radius);padding:16px;min-height:200px;}
+@media (max-width:900px){.cockpit-layout{grid-template-columns:1fr;}}
 
 /* ---------- Router-driven pages: breadcrumb + module dashboards ---------- */
 .breadcrumb{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-bottom:10px;flex-wrap:wrap;}

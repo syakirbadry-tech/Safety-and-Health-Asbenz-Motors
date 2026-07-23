@@ -16,23 +16,25 @@ const CHEMICAL_MODULE = defineBusinessModule({
   registerDesc: "Every chemical tracked by Asbenz Motors, with hazard classification and storage location.",
   quickAddLabel: "Add Chemical",
   parentLabel: "Chemical",
-  nameField: "Chemical Name",
+  nameField: "Product Name",
   // No statusDateField: unlike Machinery's "Next Inspection Due", the
   // Chemicals master record has no single inherent due-date — due/overdue
   // status lives on the sub-tables (Storage Inspection's Next Due, etc.),
   // surfaced through the Overview/Reports KPIs instead of a per-row badge.
   masterCountLabel: "Registered Chemicals",
+  // Master-Detail Cockpit (v2.0) — additional interface, see chemicalCockpit.js.
+  cockpitPath: "/chemical/cockpit",
 
   registerColumns: [
-    { key: "name", label: "Chemical Name", field: "Chemical Name", strong: true },
+    { key: "name", label: "Product Name", field: "Product Name", strong: true },
     { key: "storage", label: "Storage Location", field: "Storage Location" },
     { key: "hazard", label: "Hazard Classification", field: "Hazard Classification" },
     { key: "supplier", label: "Supplier", field: "Supplier" },
   ],
 
   generalInfoFields: [
-    "Chemical Name", "CAS Number", "Supplier", "Storage Location", "Department", "Responsible Person",
-    "Hazard Classification", "Quantity", "Unit", "Internal Code", "Review Frequency", "Status",
+    "Product Name", "Product Code", "CAS Number", "Supplier", "Storage Location", "Department", "Responsible Person",
+    "Hazard Classification", "Current Quantity", "Maximum Quantity", "Unit", "Review Frequency", "Status",
     "PPE Requirement", "Exposure Limit", "Process", "No. of Workers Exposed", "Type of Use",
     "Control Measures", "PPE Actually Used", "Notes", "Internal Remarks",
   ],
@@ -113,6 +115,11 @@ const CHEMICAL_MODULE = defineBusinessModule({
         status: "fldE1wYIm1mVc8oEG",
         notes: "fldqoLMtuiHqYNs8x",
         file: "fldwdrQQpzpboQZta",
+        // Formula field (Revision Date + 5 years) — read-only, so
+        // deliberately not in formMeta.labels below (Airtable rejects
+        // writes to formula fields; the generic sub-record form only
+        // renders inputs for formMeta.labels keys).
+        expiryDate: "fldSYtv0CM9eDYBAz",
       },
       // GHS Pictograms (multipleSelects) isn't listed here — the generic
       // sub-record form only handles single-value fields; pictograms are
@@ -180,12 +187,13 @@ const CHEMICAL_MODULE = defineBusinessModule({
         findings: "fldm8ZfahbTBnbXE6",
         nextDue: "fldaYJIQ8WVdpTLGz",
         attachment: "fldYX4eQQY6hzvwgo",
+        correctiveAction: "fldmUrQ0IqQj1fjMx",
       },
       formMeta: {
-        labels: { inspectionReference: "Inspection Reference", inspectionDate: "Inspection Date", inspector: "Inspector", result: "Result", findings: "Findings", nextDue: "Next Due" },
+        labels: { inspectionReference: "Inspection Reference", inspectionDate: "Inspection Date", inspector: "Inspector", result: "Result", findings: "Findings", nextDue: "Next Due", correctiveAction: "Corrective Action" },
         dateKeys: ["inspectionDate", "nextDue"],
         selectOptions: { result: ["Pass", "Conditional Pass", "Fail"] },
-        textareaKeys: ["findings"],
+        textareaKeys: ["findings", "correctiveAction"],
         attachmentKey: "attachment",
         attachmentLabel: "Attachment",
       },
@@ -193,6 +201,10 @@ const CHEMICAL_MODULE = defineBusinessModule({
       dueField: "nextDue",
       dueSoonLabel: "Storage Inspections Due (30d)",
       overdueLabel: "Overdue Storage Inspections",
+      // v2.0: the Storage tab merges this inspection history with the
+      // chemical's static storage profile (rendered above the list) — see
+      // moduleFramework.js's renderFwProfileSubTable.
+      profileHeaderFields: ["Storage Location", "Cabinet", "Maximum Quantity", "Current Quantity", "Storage Method", "Temperature", "Ventilation", "Segregation", "Incompatible Chemicals"],
     },
     labelInspection: {
       title: "Label Inspection",
@@ -207,16 +219,18 @@ const CHEMICAL_MODULE = defineBusinessModule({
         compliant: "fldnlw583dIy1fUP4",
         findings: "fldPfX76lW9DvF2C3",
         attachment: "fldXLfTa1RqXsrdIm",
+        labelCondition: "fldBrZ7jWytx7DDPT",
+        correctiveAction: "fldFAxTebdyIjNHAm",
       },
       formMeta: {
-        labels: { inspectionReference: "Inspection Reference", inspectionDate: "Inspection Date", inspector: "Inspector", compliant: "Compliant", findings: "Findings" },
+        labels: { inspectionReference: "Inspection Reference", inspectionDate: "Inspection Date", inspector: "Inspector", compliant: "Compliant", findings: "Findings", labelCondition: "Label Condition", correctiveAction: "Corrective Action" },
         dateKeys: ["inspectionDate"],
-        selectOptions: { compliant: ["Yes", "No"] },
-        textareaKeys: ["findings"],
+        selectOptions: { compliant: ["Yes", "No"], labelCondition: ["Good", "Faded", "Damaged", "Missing"] },
+        textareaKeys: ["findings", "correctiveAction"],
         attachmentKey: "attachment",
-        attachmentLabel: "Attachment",
+        attachmentLabel: "Photos",
       },
-      listColumns: ["inspectionDate", "compliant"],
+      listColumns: ["inspectionDate", "compliant", "labelCondition"],
       openStatusField: "compliant",
       openValues: ["No"],
       openLabel: "Non-Compliant Labels",
@@ -280,13 +294,18 @@ const CHEMICAL_MODULE = defineBusinessModule({
     },
   },
 
+  // v2.0 order: General Information (page header, above) -> SDS ->
+  // Substances -> Storage -> Label Inspection -> Waste Management ->
+  // Training -> Documents -> CHRA -> conditional modules (Exposure
+  // Monitoring/LEV/Biological Monitoring/Health Surveillance, grouped
+  // together via extraProfileTabs below CHRA, each gated by its own
+  // assessor-set "<X> Required" flag on Chemicals).
   // No historyTab — unlike Machinery's PM+CM, none of these sub-tables share
   // an obvious "merged timeline" (each is its own confirmed event).
   profileSubTabs: [
-    { subKey: "sdsDocuments", tabKey: "sds", label: "SDS Library", emptyNoun: "SDS revisions" },
+    { subKey: "sdsDocuments", tabKey: "sds", label: "SDS", emptyNoun: "SDS revisions" },
     { subKey: "substances", tabKey: "substances", label: "Substances", emptyNoun: "substances" },
-    { subKey: "exposureMonitoring", tabKey: "exposure", label: "Exposure Monitoring", emptyNoun: "exposure monitoring records" },
-    { subKey: "storageInspection", tabKey: "storage", label: "Storage Inspection", emptyNoun: "storage inspections" },
+    { subKey: "storageInspection", tabKey: "storage", label: "Storage", emptyNoun: "storage inspections" },
     { subKey: "labelInspection", tabKey: "label", label: "Label Inspection", emptyNoun: "label inspections" },
     { subKey: "wasteManagement", tabKey: "waste", label: "Waste Management", emptyNoun: "waste disposal records" },
     { subKey: "training", tabKey: "training", label: "Training", emptyNoun: "training records" },
@@ -328,7 +347,49 @@ const CHEMICAL_MODULE = defineBusinessModule({
     ],
   },
 
-  attachmentsNote: 'To upload or replace files, use "Edit / Manage Files" above, or manage SDS revisions from the SDS Library tab.',
+  attachmentsNote: 'To upload or replace files, use "Edit / Manage Files" above, or manage SDS revisions from the SDS tab.',
+
+  // Register page Filter/Search/Quick-Filter/Export toolbar (v2.0), powered
+  // by GET /chemicals/reports/register-data — see moduleFramework.js's
+  // renderFwRegisterFiltersPage for the generic engine this config drives.
+  registerFilters: {
+    dataEndpoint: "/chemicals/reports/register-data",
+    rowsKey: "rows",
+    columns: [
+      { key: "productName", label: "Product Name", strong: true },
+      { key: "casNumber", label: "CAS Number", render: (row) => escapeHtml(naFallback(row.casNumber, "Not Available")) },
+      { key: "storageLocation", label: "Storage Location" },
+      { key: "hazardClassification", label: "Hazard Classification", render: (row) => escapeHtml(naFallback(row.hazardClassification, "Not Classified")) },
+      { key: "supplier", label: "Supplier" },
+      { key: "manufacturer", label: "Manufacturer", render: (row) => escapeHtml(naFallback(row.manufacturer, "Not Available")) },
+      { key: "physicalForm", label: "Physical Form", render: (row) => escapeHtml(naFallback(row.physicalForm, "Not Classified")) },
+      { key: "sdsStatus", label: "SDS Status", pill: true },
+      {
+        key: "viewSds",
+        label: "SDS",
+        render: (row) => row.currentSdsId
+          ? `<button type="button" class="btn small" data-view-file="/sds-documents:${row.currentSdsId}:fldwdrQQpzpboQZta">📄 View SDS</button>`
+          : `<span class="text-dim">—</span>`,
+      },
+    ],
+    searchFields: ["productName", "casNumber", "supplier", "manufacturer"],
+    dropdownFilters: [
+      { key: "hazardClassification", label: "Hazard Classification" },
+      { key: "storageLocation", label: "Storage Location" },
+      { key: "supplier", label: "Supplier" },
+      { key: "manufacturer", label: "Manufacturer" },
+      { key: "physicalForm", label: "Physical Form" },
+      { key: "sdsStatus", label: "SDS Status" },
+    ],
+    quickFilters: [
+      { key: "all", label: "All", predicate: () => true },
+      { key: "hazardous", label: "Hazardous", predicate: (r) => !!r.hazardClassification },
+      { key: "nonHazardous", label: "Non-Hazardous", predicate: (r) => !r.hazardClassification },
+      { key: "currentSds", label: "Current SDS", predicate: (r) => r.sdsStatus === "Current" },
+      { key: "expiringSoon", label: "Expiring Soon", predicate: (r) => r.sdsStatus === "Expiring Soon" },
+      { key: "expiredSds", label: "Expired SDS", predicate: (r) => r.sdsStatus === "Expired" || r.sdsStatus === "Missing" },
+    ],
+  },
 
   // Bespoke tabs that don't fit the generic sub-table shape — same spirit as
   // Machinery's AI license-extract endpoints sitting outside the framework.
@@ -383,7 +444,29 @@ const CHEMICAL_MODULE = defineBusinessModule({
   // driven wizard (below) instead of the plain master-record overlay form —
   // see the customAddHandler hook in framework/moduleFramework.js.
   customAddHandler: () => openAddChemicalWizard(),
+
+  // "Expired SDS" doesn't fit the generic per-sub-table KPI shape (it's
+  // time-based off the Expiry Date formula field, not a stored status) —
+  // reuses the sdsDocuments records the Overview/Reports tabs already
+  // fetched (dashboardSubTabOrder includes "sdsDocuments"), no extra
+  // request. tabKey jumps to the SDS tab, same as every other KPI card.
+  extraOverviewKpis: (dataByKey) => {
+    const F = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
+    const expiredCount = (dataByKey.sdsDocuments || []).filter(
+      (r) => r.fields[F.status] === "Current" && clientSdsExpiryStatus(r.fields[F.expiryDate]) === "Expired"
+    ).length;
+    return [{ label: "Expired SDS", value: expiredCount, tone: expiredCount ? "bad" : "ok", tabKey: "sdsDocuments" }];
+  },
 });
+
+// Mirrors the server's sdsExpiryStatus (server/routes/chemicals.js) for the
+// Overview/Reports "Expired SDS" KPI — cheap to duplicate (one comparison),
+// not worth a round trip since the sdsDocuments records are already local.
+function clientSdsExpiryStatus(expiryDateStr) {
+  if (!expiryDateStr) return null;
+  const daysLeft = (new Date(expiryDateStr) - new Date()) / (1000 * 60 * 60 * 24);
+  return daysLeft < 0 ? "Expired" : daysLeft <= 90 ? "Expiring Soon" : "Current";
+}
 
 // Missing Value Rules (v2.0 brief): a derived/AI-sourced field that has no
 // data shows a specific fallback rather than a bare "—", so the register and

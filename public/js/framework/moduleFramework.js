@@ -146,17 +146,20 @@ function fw_subTableKpis(config, dataByKey, { overdue }) {
   return (config.dashboardSubTabOrder || Object.keys(config.subTables)).map((subKey) => {
     const st = config.subTables[subKey];
     const records = dataByKey[subKey];
+    // tabKey makes every card clickable -> jumps to that sub-table's tab in
+    // the same mountTabs instance (see the [data-kpi-tab] delegated
+    // listener below).
     if (st.dueField) {
       const fieldId = st.fields[st.dueField];
       const value = overdue ? fw_overdueCount(records, fieldId) : fw_dueSoonCount(records, fieldId);
       const label = overdue ? st.overdueLabel || `Overdue ${st.title}` : st.dueSoonLabel || `${st.title} Due Soon (30d)`;
-      return { label, value, tone: value ? (overdue ? "bad" : "warn") : "ok" };
+      return { label, value, tone: value ? (overdue ? "bad" : "warn") : "ok", tabKey: subKey };
     }
     if (st.openStatusField) {
       const value = fw_openCount(records, st);
-      return { label: st.openLabel || `Open ${st.title}`, value, tone: value ? "bad" : "ok" };
+      return { label: st.openLabel || `Open ${st.title}`, value, tone: value ? "bad" : "ok", tabKey: subKey };
     }
-    return { label: st.countLabel || `${st.title} Logged`, value: records.length, tone: "neutral" };
+    return { label: st.countLabel || `${st.title} Logged`, value: records.length, tone: "neutral", tabKey: subKey };
   });
 }
 
@@ -165,6 +168,12 @@ function fw_subTableKpis(config, dataByKey, { overdue }) {
 // ---------------------------------------------------------------------
 
 function renderRegisterPage(config) {
+  // registerFilters: opt-in Filter/Search/Quick-Filter/Export toolbar over a
+  // pre-enriched data endpoint (avoids an N+1 fetch for derived columns) —
+  // generic primitive, wired up for Chemical Management first (see
+  // chemical.module.js), reusable by any future module the same way.
+  if (config.registerFilters) return renderFwRegisterFiltersPage(config);
+
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
 
@@ -187,6 +196,182 @@ function renderRegisterPage(config) {
       console.error(err);
       document.getElementById("fwRegisterTable").innerHTML = Components.emptyState(`Could not load ${config.title.toLowerCase()}.`);
     });
+}
+
+// ---------------------------------------------------------------------
+// Register page with Filter/Search/Quick-Filter/Export — config.registerFilters:
+//   dataEndpoint  -> api() path returning { [rowsKey]: row[] } of pre-enriched,
+//                    plain-property (not Airtable-field-ID-keyed) rows
+//   rowsKey       -> property name holding the row array (default "rows")
+//   columns       -> [{ key, label, strong?, pill?, render?(row) }]
+//   searchFields  -> row property keys included in the free-text search box
+//   dropdownFilters -> [{ key, label }] — options are the row's own distinct values
+//   quickFilters  -> [{ key, label, predicate(row) }], first entry is the default
+// ---------------------------------------------------------------------
+
+function renderFwRegisterFiltersPage(config) {
+  const view = document.getElementById("view");
+  const isAdmin = Auth.user()?.role === "Admin";
+  const rf = config.registerFilters;
+
+  view.innerHTML = `
+    ${Components.breadcrumb([{ label: "Dashboard", href: "/" }, { label: config.title, href: config.basePath }, { label: config.registerLabel }])}
+    <div class="page-head"><h1>${escapeHtml(config.registerLabel)}</h1><p>${escapeHtml(config.registerDesc)}</p></div>
+    <div class="no-print" id="fwFilterToolbar"><div class="page-loading">Loading…</div></div>
+    <div id="fwRegisterTable"></div>
+  `;
+
+  api(rf.dataEndpoint)
+    .then((data) => {
+      const rows = data[rf.rowsKey || "rows"] || [];
+      mountFwRegisterFilters(config, rows);
+    })
+    .catch((err) => {
+      console.error(err);
+      document.getElementById("fwFilterToolbar").innerHTML = "";
+      document.getElementById("fwRegisterTable").innerHTML = Components.emptyState(`Could not load ${config.title.toLowerCase()}.`);
+    });
+
+  function mountFwRegisterFilters(config, allRows) {
+    const rf = config.registerFilters;
+    const state = { search: "", dropdowns: {}, quickKey: rf.quickFilters?.[0]?.key };
+
+    const distinctValues = (key) =>
+      Array.from(new Set(allRows.map((r) => r[key]).filter(Boolean))).sort();
+
+    const toolbar = document.getElementById("fwFilterToolbar");
+    toolbar.innerHTML = `
+      <div class="flex gap-8 flex-wrap" style="margin-bottom:10px;">
+        ${(rf.quickFilters || []).map((qf) => `<button type="button" class="btn small" data-quick-filter="${qf.key}">${escapeHtml(qf.label)}</button>`).join("")}
+      </div>
+      <div class="flex gap-8 flex-wrap" style="align-items:flex-end;margin-bottom:14px;">
+        <div class="field" style="min-width:200px;margin:0;">
+          <label>Search</label>
+          <input type="text" id="fwSearchInput" placeholder="Search…" />
+        </div>
+        ${(rf.dropdownFilters || []).map((df) => `
+          <div class="field" style="min-width:160px;margin:0;">
+            <label>${escapeHtml(df.label)}</label>
+            <select data-dropdown-filter="${df.key}">
+              <option value="">All</option>
+              ${distinctValues(df.key).map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("")}
+            </select>
+          </div>`).join("")}
+        <button type="button" class="btn small" id="fwFilterResetBtn">Reset</button>
+        ${isAdmin ? `<button type="button" class="btn primary small" id="fwAddBtn">+ ${escapeHtml(config.quickAddLabel)}</button>` : ""}
+        <button type="button" class="btn small" id="fwExportExcelBtn">Export Excel</button>
+        <button type="button" class="btn small" id="fwExportPdfBtn">Export PDF</button>
+      </div>
+    `;
+
+    if (isAdmin) document.getElementById("fwAddBtn")?.addEventListener("click", () => fw_triggerAdd(config));
+
+    function applyFilters() {
+      const quick = (rf.quickFilters || []).find((qf) => qf.key === state.quickKey);
+      let rows = quick ? allRows.filter(quick.predicate) : allRows.slice();
+      Object.entries(state.dropdowns).forEach(([key, val]) => {
+        if (val) rows = rows.filter((r) => r[key] === val);
+      });
+      if (state.search) {
+        const term = state.search.toLowerCase();
+        rows = rows.filter((r) => (rf.searchFields || []).some((k) => String(r[k] || "").toLowerCase().includes(term)));
+      }
+      renderFwFilteredTable(config, rows);
+      toolbar.querySelectorAll("[data-quick-filter]").forEach((btn) => btn.classList.toggle("primary", btn.dataset.quickFilter === state.quickKey));
+    }
+
+    document.getElementById("fwSearchInput").addEventListener("input", (e) => { state.search = e.target.value; applyFilters(); });
+    toolbar.querySelectorAll("[data-dropdown-filter]").forEach((sel) => {
+      sel.addEventListener("change", (e) => { state.dropdowns[sel.dataset.dropdownFilter] = e.target.value; applyFilters(); });
+    });
+    toolbar.querySelectorAll("[data-quick-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => { state.quickKey = btn.dataset.quickFilter; applyFilters(); });
+    });
+    document.getElementById("fwFilterResetBtn").addEventListener("click", () => {
+      state.search = "";
+      state.dropdowns = {};
+      state.quickKey = rf.quickFilters?.[0]?.key;
+      document.getElementById("fwSearchInput").value = "";
+      toolbar.querySelectorAll("[data-dropdown-filter]").forEach((sel) => (sel.value = ""));
+      applyFilters();
+    });
+    document.getElementById("fwExportExcelBtn").addEventListener("click", () => exportFwRowsAsCsv(config, state, allRows));
+    document.getElementById("fwExportPdfBtn").addEventListener("click", () => window.print());
+
+    applyFilters();
+  }
+
+  function renderFwFilteredTable(config, rows) {
+    const rf = config.registerFilters;
+    const columns = rf.columns.map((c) => ({ key: c.key, label: c.label }));
+    const tableRows = rows.map((row) => {
+      const cells = {};
+      rf.columns.forEach((c) => {
+        const display = c.render ? c.render(row) : escapeHtml(String(row[c.key] ?? "") || "—");
+        cells[c.key] = c.strong ? `<strong>${display}</strong>` : c.pill ? Components.statusPillFor(row[c.key]) : display;
+      });
+      return { navigate: rf.navigateBase !== false ? `${config.basePath}/${row.id}` : undefined, cells, dataAttrs: { "data-row-id": row.id } };
+    });
+    document.getElementById("fwRegisterTable").innerHTML = Components.dataTable({
+      columns,
+      rows: tableRows,
+      emptyLabel: `No ${config.title.toLowerCase()} match these filters.`,
+    });
+    bindFwViewSdsButtons(config);
+  }
+}
+
+// Generic "open the latest file for this record" button — dataset carries
+// "<apiPath>:<recordId>:<attachmentFieldId>" (see chemical.module.js's
+// registerFilters.columns for the "📄 View SDS" cell that uses this).
+// Always re-fetches the record at click time rather than reusing a cached
+// attachment URL from the register-data payload — Airtable attachment URLs
+// are short-lived and would eventually 403 if cached.
+function bindFwViewSdsButtons(config) {
+  document.querySelectorAll("[data-view-file]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const [apiPath, recordId, fieldId] = btn.dataset.viewFile.split(":");
+      const originalText = btn.textContent;
+      btn.textContent = "Loading…";
+      btn.disabled = true;
+      try {
+        const { record } = await api(`${apiPath}/${recordId}`);
+        const files = record.fields[fieldId] || [];
+        if (files[0]?.url) window.open(files[0].url, "_blank", "noopener");
+        else toast("No file attached to this record.", true);
+      } catch (err) {
+        toast("Could not load the file.", true);
+      } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+function exportFwRowsAsCsv(config, state, allRows) {
+  const rf = config.registerFilters;
+  const quick = (rf.quickFilters || []).find((qf) => qf.key === state.quickKey);
+  let rows = quick ? allRows.filter(quick.predicate) : allRows.slice();
+  Object.entries(state.dropdowns).forEach(([key, val]) => { if (val) rows = rows.filter((r) => r[key] === val); });
+  if (state.search) {
+    const term = state.search.toLowerCase();
+    rows = rows.filter((r) => (rf.searchFields || []).some((k) => String(r[k] || "").toLowerCase().includes(term)));
+  }
+  const headers = rf.columns.filter((c) => !c.render).map((c) => c.label);
+  const csvEscape = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines = [headers.map(csvEscape).join(",")];
+  rows.forEach((row) => {
+    lines.push(rf.columns.filter((c) => !c.render).map((c) => csvEscape(row[c.key])).join(","));
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${config.key}-register-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderFwRegisterTable(config, records) {
@@ -258,14 +443,31 @@ async function renderFwOverviewTab(config) {
     const dataByKey = Object.fromEntries(subKeys.map((k, i) => [k, subLists[i]]));
 
     const kpis = [
-      { label: config.masterCountLabel, value: masters.length, tone: "neutral" },
+      { label: config.masterCountLabel, value: masters.length, tone: "neutral", navigate: `${config.basePath}/register` },
       ...fw_subTableKpis(config, dataByKey, { overdue: false }),
+      // Escape hatch for a KPI that doesn't fit the generic per-sub-table
+      // shape (e.g. Chemical Management's "Expired SDS", time-based off a
+      // formula field; Corrective Actions/CAPA's "Overdue Actions", which
+      // has no sub-table at all to read from) — same spirit as
+      // extraDashboardTabs. Both dataByKey (sub-tables) and masters (the
+      // master record list) are handed over so it can reuse data already
+      // fetched here instead of issuing another request.
+      ...(config.extraOverviewKpis ? config.extraOverviewKpis(dataByKey, masters) : []),
     ];
 
     const isAdmin = Auth.user()?.role === "Admin";
+    // cockpitPath: optional — a module opts into a Master-Detail Cockpit
+    // (an ADDITIONAL interface alongside Register/Profile, not a
+    // replacement) by setting this to its cockpit route. Chemical
+    // Management is the first; unset for every other module, unaffected.
+    // relatedLinks: optional [{ label, path }] — extra quick-action buttons
+    // to a related-but-not-master-detail page (e.g. OSH Committee's
+    // "Committee Members" roster, which isn't a sub-table of Meetings).
     const quickActions = `<div class="flex gap-8 flex-wrap" style="margin-top:18px;">
       ${isAdmin ? `<button class="btn primary small" data-quick-add="${config.key}">+ ${escapeHtml(config.quickAddLabel)}</button>` : ""}
       <button class="btn small" data-navigate="${config.basePath}/register">Open ${escapeHtml(config.registerLabel)}</button>
+      ${config.cockpitPath ? `<button class="btn small" data-navigate="${config.cockpitPath}">Open Master-Detail Cockpit</button>` : ""}
+      ${(config.relatedLinks || []).map((rl) => `<button class="btn small" data-navigate="${rl.path}">${escapeHtml(rl.label)}</button>`).join("")}
     </div>`;
 
     return `${Components.sectionHead("Key Indicators")}${Components.kpiRow(kpis)}${quickActions}`;
@@ -365,8 +567,9 @@ async function renderFwReportsTab(config) {
     ]);
     const dataByKey = Object.fromEntries(subKeys.map((k, i) => [k, subLists[i]]));
     const kpis = [
-      { label: config.masterCountLabelReports || config.masterCountLabel, value: masters.length, tone: "neutral" },
+      { label: config.masterCountLabelReports || config.masterCountLabel, value: masters.length, tone: "neutral", navigate: `${config.basePath}/register` },
       ...fw_subTableKpis(config, dataByKey, { overdue: true }),
+      ...(config.extraOverviewKpis ? config.extraOverviewKpis(dataByKey, masters) : []),
     ];
     return `
       ${Components.sectionHead("Compliance Summary Report", "Snapshot as of " + fmtDateTime(new Date().toISOString()))}
@@ -434,7 +637,7 @@ async function renderProfilePage(config, params) {
     ...config.profileSubTabs.map((t) => ({
       key: t.tabKey,
       label: t.label,
-      render: () => renderFwProfileSubTable(config, t.subKey, profile.subTables[t.subKey], t.emptyNoun),
+      render: () => renderFwProfileSubTable(config, t.subKey, profile.subTables[t.subKey], t.emptyNoun, record),
       afterRender: bindSubHandlers,
     })),
     ...(config.photos ? [{ key: "photos", label: "Photos", render: () => renderFwPhotosTab(config, record), afterRender: (el) => bindFwPhotoUpload(config, el, record.id) }] : []),
@@ -519,15 +722,29 @@ function renderFwHistoryTab(config, profile) {
   return actions + table;
 }
 
-function renderFwProfileSubTable(config, subKey, records, emptyNoun) {
+function renderFwProfileSubTable(config, subKey, records, emptyNoun, masterRecord) {
   const st = config.subTables[subKey];
   const isAdmin = Auth.user()?.role === "Admin";
   const actions = isAdmin
     ? `<div class="flex gap-8" style="justify-content:flex-end;margin-bottom:14px;"><button type="button" class="btn small" data-add-sub="${subKey}">+ Add ${escapeHtml(st.title)}</button></div>`
     : "";
+  // profileHeaderFields: renders selected master-record fields above the
+  // sub-table list, for tabs that merge a "profile" (static, on the master
+  // record) with a "history" (the sub-table) — e.g. Chemical Management's
+  // Storage tab merges the Chemicals storage-profile fields with the
+  // Chemical Storage Inspection history list into one tab.
+  const header = st.profileHeaderFields && masterRecord
+    ? `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:16px;">
+        ${st.profileHeaderFields.map((label) => {
+          const val = masterRecord.fields[fw_masterField(config, label)];
+          return `<div class="field"><label>${escapeHtml(label)}</label><div style="padding:8px 0;font-size:13.5px;">${escapeHtml(String(val || "—"))}</div></div>`;
+        }).join("")}
+      </div>
+      <div class="section-head" style="margin-top:0;"><h2 style="font-size:13px;">${escapeHtml(st.title)} History</h2></div>`
+    : "";
   const columns = fw_subTableColumns(config, subKey, { withParent: false });
   const rows = records.map((r) => fw_subTableRow(config, subKey, r, { withParent: false, openOnClick: true }));
-  return actions + Components.dataTable({ columns, rows, emptyLabel: `No ${emptyNoun} recorded yet.` });
+  return header + actions + Components.dataTable({ columns, rows, emptyLabel: `No ${emptyNoun} recorded yet.` });
 }
 
 function renderFwPhotosTab(config, record) {
@@ -720,6 +937,19 @@ document.addEventListener("click", (e) => {
   if (!btn) return;
   const config = MODULE_REGISTRY[btn.dataset.quickAdd];
   if (config) fw_triggerAdd(config);
+});
+
+// Every KPI card becomes clickable (v2.0): a card with data-kpi-tab jumps to
+// that sub-table's tab within the same mountTabs instance it was rendered
+// in (Module Dashboard Overview/Reports -> that sub-table's own tab) — cards
+// with data-navigate instead route via the router's own delegated listener
+// (router.js), unaffected by this one.
+document.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-kpi-tab]");
+  if (!card) return;
+  const container = card.closest("#fwDashboardTabs, #fwProfileTabs");
+  const tabBtn = container?.querySelector(`.tab[data-tab-key="${card.dataset.kpiTab}"]`);
+  if (tabBtn) tabBtn.click();
 });
 
 document.addEventListener("change", async (e) => {
