@@ -1,0 +1,9 @@
+{
+  "chemical.masterDetail": true,
+  "chemical.documentsAggregation": true,
+  "chemical.aiExtraction": true,
+  "chemical.substances": true,
+  "chemical.registerFilters": true,
+  "storage.inspection": true,
+  "exposureMonitoring": true
+}

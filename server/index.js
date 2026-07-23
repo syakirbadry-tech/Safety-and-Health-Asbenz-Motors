@@ -25,6 +25,7 @@ const sdsDocumentsRoutes = require("./routes/sdsDocuments");
 const chemicalSafetyTrainingRoutes = require("./routes/chemicalSafetyTraining");
 const companySettingsRoutes = require("./routes/companySettings");
 const doshRegisterGenerationsRoutes = require("./routes/doshRegisterGenerations");
+const configRoutes = require("./routes/config");
 const adminRoutes = require("./routes/admin");
 
 const app = express();
@@ -54,6 +55,7 @@ app.use("/api/sds-documents", authenticate, sdsDocumentsRoutes);
 app.use("/api/chemical-safety-training", authenticate, chemicalSafetyTrainingRoutes);
 app.use("/api/company-settings", authenticate, companySettingsRoutes);
 app.use("/api/dosh-register-generations", authenticate, doshRegisterGenerationsRoutes);
+app.use("/api/config", authenticate, configRoutes);
 
 // Admin-only (checked inside admin.js)
 app.use("/api/admin", adminRoutes);
