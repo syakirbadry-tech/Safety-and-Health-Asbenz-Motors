@@ -136,6 +136,28 @@ Added to satisfy the DOSH "Guidelines for the Preparation of a Chemical Register
 
 **Generated DOSH Chemical Register**: `GET /api/chemicals/reports/dosh-register-data` aggregates Company Settings + every Chemical's workplace fields + two *derived* flags — CSDS (Y/N: does the chemical have a Current SDS Documents record) and Label (Y/N: the most recent Chemical Label Inspection's Compliant value) — computed at request time rather than stored, since both already exist elsewhere in the system. Rendered as a print-optimized HTML report (`/chemical/dosh-register`) matching the guidance document's Section A/B/C layout; the browser's native "Print to PDF" produces the actual file rather than adding a server-side PDF-generation dependency.
 
+### 3.4.3 Chemical Lifecycle Management v2.0 — Substances, Storage profile, conditional flags, AI Extraction Logs
+
+Redesigns Chemical Management from a document-oriented module into an enterprise Chemical Lifecycle Management system (Product → SDS Revisions → Substances → Storage/Label/Waste/Training → Documents → CHRA), per the v2.0 brief. Additive only — nothing below removes or renames any field ID, only adds new fields/tables or relabels a field's *display name* (its ID, and therefore every route that reads it, is unchanged).
+
+**`Chemicals` — relabels:** the name field (`fldbGqmRy2suVjH6G`) is now displayed as **Product Name** — the trade/product identity, distinct from the SDS-defined "Chemical Name," which now lives per-ingredient on `Substances` (below). Never use Product Name where the guidance document means Chemical Name, and vice versa. `Internal Code` → **Product Code**. `Quantity` → **Current Quantity**.
+
+**`Chemicals` — new fields:** Storage profile (Cabinet, Maximum Quantity, Storage Method, Temperature, Ventilation, Segregation, Incompatible Chemicals) — merged into the Storage tab alongside the existing `Chemical Storage Inspection` history, not a separate table. Conditional-module flags (Exposure Monitoring / LEV / Biological Monitoring / Health Surveillance Required, each Yes/No/Not Assessed) — **manual, assessor-set fields, not AI-inferred**, gating whether those Profile tabs appear at all.
+
+**New table — `Substances`.** One `Chemicals` record has many `Substances` records, extracted automatically from the SDS's Section 3 (Composition/Information on Ingredients) by the same Gemini extraction pipeline that already reads SDS Section 1 data (`server/lib/extract.js`'s `extractSDSData`, extended with a `substances[]` array in its response schema). Fields: Chemical Name, `Chemical` (link → Chemicals), CAS Number, EC Number, REACH Number, Concentration, Hazard Classification, Signal Word, H Statements, P Statements, GHS Pictograms. Never manually duplicated — the "+ Add Chemical" wizard bulk-creates these records right after creating the Chemical and its first SDS Documents record.
+
+**`SDS Documents` — new field:** `Expiry Date`, an Airtable **formula field** — `DATEADD({Revision Date}, 5, 'years')`. This is a different concept from the existing `Status` field (Current/Superseded, which tracks revision history — never overwritten, see §3.4.2): Expiry Date drives a *time-based* Current/Expiring Soon/Expired status, computed at request time (90-day "Expiring Soon" window) in `server/routes/chemicals.js`, never stored — same "compute, don't duplicate" pattern the DOSH register's CSDS/Label flags already use.
+
+**`Chemical Storage Inspection` — new field:** Corrective Action.
+
+**`Chemical Label Inspection` — new fields:** Label Condition (Good/Faded/Damaged/Missing), Corrective Action. The existing `attachment` field is now used as a multi-file Photos gallery (Airtable attachment fields already support multiple files — no schema change required for that part).
+
+**`Waste Management` — new fields:** Scheduled Waste Code, Disposal Certificate (attachment). Relabels: `Waste Type` → **Waste Category**, `Contractor` → **Licensed Contractor**, `Manifest` → **Consignment Note**.
+
+**Centralized Documents.** No new table — `GET /api/chemicals/:id/profile` now returns a computed `documents[]` array flattening every attachment field across the Chemical record and every linked sub-table (SDS files, inspection photos, training certificates, waste certificates, CHRA reports, …), each tagged with its source module/record. This is the data source for the Profile page's single Documents tab, which replaces the old separate Photos + Attachments tabs. Built via a new optional `postProcess` hook on `buildProfileRoute` (`server/lib/profileAggregation.js`) — generic, unused by Machinery, fully backward compatible.
+
+**`AI Extraction Logs` (new table, platform-wide, not Chemical-specific).** Operational log of every AI (Gemini) extraction call — license and SDS intake alike. Not business data; feeds a future AI Operations Center. Fields: Log Reference, Extraction Type (SDS/License), Model Used, Prompt Version, Extraction Version, Timestamp, Duration (ms), Success, Warnings, Record Reference. Written by `server/lib/aiExtractionLog.js`, called from both `extractLicenseData` and `extractSDSData` in `server/lib/extract.js`.
+
 ### 3.5 HRA table
 
 Purpose:
@@ -190,6 +212,20 @@ Documented here so the redesign is traceable end to end; these tables are create
 **Operational Safety** (merges High Risk + SOP) — `HIRARC` is reused as the High Risk Activities register. A single generalized `Permit To Work` table with an `Activity Type` singleSelect (LOTO, Working at Height, Hot Work, Confined Space, Electrical Work, Lifting Operations, Excavation) replaces what would otherwise be seven near-identical permit tables. `SOP`'s `Document Type` field (added above) lets "Safe Work Procedures" and "Work Instructions" both be filtered views of the same table. New `Contractors` table for Contractor Safety. New `Safety Inspections` table for general (non-machine, non-chemical) Inspection Forms.
 
 Both are expected to be implemented as a new config file on the module framework (§5.2 of ARCHITECTURE.md) rather than new page-rendering code, following the pattern Chemical Management already proved out.
+
+### 3.9 Management capabilities — Actions (Corrective Actions/CAPA), OSH Committee
+
+Added between Chemical Lifecycle Management v2.0 and Noise Management, per the decision to build cross-cutting management capabilities before the next technical/document module.
+
+**`Actions`** — the Corrective Actions/CAPA engine. One unified table, presented in the UI as a single register (default view: Corrective + Preventive combined, branded "Corrective Actions/CAPA"; "All Actions" is the same register with an unfiltered quick-filter chip — there is no separate "Action Tracking" table or route). Fields: Action Reference, Title, Description, Date Raised, Action Type (Corrective/Preventive/General/Improvement), Priority (Low/Medium/High/Critical), Status (Open/In Progress/Completed/Cancelled), Assigned To, Assigned Department, Representation (Employer Representative/Employee Representative/Management/Safety & Health Officer/N/A — mirrors `OSH Committee Members`' Position options), Due Date, Completed Date, Source Module (Machinery/Chemical Management/HRA/HIRARC/SOP/CHRA/OSH Committee/Incident/Audit/Other), Source Reference, Root Cause, Corrective/Preventive Measures, Effectiveness Review, Verified Effective (Yes/No/Pending), Evidence (attachment), Notes.
+
+Source Module + Source Reference optionally trace an action back to whatever finding raised it — a failed inspection, a CHRA finding, an OSH Committee meeting decision — using the same free-text-pointer pattern as `Activity Log`'s `Record Reference` (§3.2), not a hard link, since the source can be any table in the app. Freestanding actions simply leave both blank.
+
+`GET /api/actions/reports/register-data` computes `isOverdue` (Due Date < today AND Status not in [Completed, Cancelled]) at request time rather than storing it — the same "compute, don't duplicate" pattern as Chemical Management's SDS expiry status (§3.4.3).
+
+**`OSH Committee Meetings`** — meeting schedule and minutes. Meeting Reference, Meeting Date, Meeting Type (Ordinary/Special/Annual General), Chairperson, Secretary, Attendees (free text — a v1 simplification; a linked multi-select to `OSH Committee Members` is a natural later upgrade), Agenda, Key Decisions/Notes, Minutes (attachment), Next Meeting Date, Status (Scheduled/Completed/Cancelled).
+
+**`OSH Committee Members`** — the committee roster, independent of any single meeting (a member attends many meetings; a meeting has many attendees — a many-to-many relationship the master/sub-table module framework doesn't fit, so this is a flat table with its own small dedicated page rather than a sub-table of Meetings — see ARCHITECTURE.md §5.2.4). Member Name, Position (Chairman/Secretary/Employer Representative/Employee Representative/Safety & Health Officer/Member), Department, Term Start, Term End, Contact, Status (Active/Inactive).
 
 ## 4. Relationship and linkage model
 

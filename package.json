@@ -1,6 +1,6 @@
 {
   "name": "osh-c-portal",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "OSH-C Compliance Tracker portal for Asbenz Motors — login, role-based access, and admin panel backed by Airtable.",
   "main": "server/index.js",
   "scripts": {
