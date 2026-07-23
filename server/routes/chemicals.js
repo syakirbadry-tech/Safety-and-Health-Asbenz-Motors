@@ -42,7 +42,8 @@ router.post("/extract-sds-preview", upload.single("file"), async (req, res) => {
 // same generic framework), keyed by the sub-table names the frontend's
 // chemical.module.js config expects: exposureMonitoring, storageInspection,
 // labelInspection, wasteManagement, sdsDocuments, training, chra (CHRA reused
-// as the risk-assessment tab, same pattern as HIRARC for Machinery).
+// as the risk-assessment tab, same pattern as HIRARC for Machinery),
+// substances (Section 3 ingredients).
 router.get(
   "/:id/profile",
   buildProfileRoute({
@@ -58,6 +59,7 @@ router.get(
       { key: "sdsDocuments", tableId: schema.sdsDocuments.tableId, linkFieldId: schema.sdsDocuments.fields.chemical },
       { key: "training", tableId: schema.chemicalSafetyTraining.tableId, linkFieldId: schema.chemicalSafetyTraining.fields.chemical },
       { key: "chra", tableId: schema.chra.tableId, linkFieldId: schema.chra.fields.chemicalLink },
+      { key: "substances", tableId: schema.substances.tableId, linkFieldId: schema.substances.fields.chemical },
     ],
   })
 );

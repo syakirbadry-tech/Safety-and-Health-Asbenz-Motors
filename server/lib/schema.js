@@ -150,7 +150,7 @@ module.exports = {
   chemicals: {
     tableId: "tblCirtjLUiBij9Rz",
     fields: {
-      chemicalName: "fldbGqmRy2suVjH6G",
+      chemicalName: "fldbGqmRy2suVjH6G", // display name "Product Name" — see Substances for the true per-ingredient Chemical Name
       casNumber: "fldeQ9F4mDbUbT0Nz",
       supplier: "fldAil7tpo8AhdpOF",
       storageLocation: "fldxUKmNa3TKD5OKl",
@@ -170,9 +170,29 @@ module.exports = {
       internalRemarks: "flduyfC7TMj9iexV9",
       responsiblePerson: "fldx1JJdpsJ2YMiID",
       unit: "fldcfaKvLsKHYqOYk",
-      internalCode: "fld6qQuy0SSDmW5Xs",
+      internalCode: "fld6qQuy0SSDmW5Xs", // display name "Product Code"
       reviewFrequency: "fldLDJ6PHCJDgckGq",
       status: "fldpSbpbNDsz7ecTV",
+    },
+  },
+
+  // Section 3 (Composition/Information on Ingredients) ingredients extracted
+  // from a chemical's SDS. One Chemical (Product) has many Substances — see
+  // DATABASE.md for the Product Name vs Chemical Name distinction.
+  substances: {
+    tableId: "tblKbPw4tgcOuLri7",
+    fields: {
+      chemicalName: "fldkqn3fqY9TzbmUG",
+      chemical: "fld7NOShCSTJX9NC3",
+      casNumber: "fldwMdQhjd0fTwhDz",
+      ecNumber: "fldNMjQm1gZGvJWuw",
+      reachNumber: "fld0y9wOY6ROj308B",
+      concentration: "fldkWme41Ajo3cHCf",
+      hazardClassification: "fldDxlPCKzqFmSraV",
+      signalWord: "fldYHffBOrgGVJ8KL",
+      hStatements: "fld5ToAescr6NayoO",
+      pStatements: "fldqRmM90GZcIW4uN",
+      ghsPictograms: "fldjxcnz8orvmo7gr",
     },
   },
 

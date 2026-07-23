@@ -52,14 +52,17 @@ const MODULES = {
     desc: "Chemical register & inventory",
     icon: "flask",
     dateField: null, // no inherent due-date on the master record — dates live on sub-tables (Exposure Monitoring, Storage/Label Inspection)
-    primary: "Chemical Name",
+    primary: "Product Name",
     fields: {
-      "Chemical Name": "fldbGqmRy2suVjH6G",
+      // "Product Name" — the trade/product identity (v2.0: renamed from
+      // "Chemical Name", which is now per-ingredient on the Substances
+      // table — see DATABASE.md's Product Name vs Chemical Name distinction).
+      "Product Name": "fldbGqmRy2suVjH6G",
       "CAS Number": "fldeQ9F4mDbUbT0Nz",
       "Supplier": "fldAil7tpo8AhdpOF",
       "Storage Location": "fldxUKmNa3TKD5OKl",
       "Hazard Classification": "fldrkm7F45ofeceuj",
-      "Quantity": "fldT4nF1jJvpPBUhu",
+      "Current Quantity": "fldT4nF1jJvpPBUhu",
       "PPE Requirement": "fldqdGhmv5yzDwd7F",
       "Exposure Limit": "fldEwYl2ZjPxg5HRV",
       "Notes": "fldr1YRwTz3nGmpGf",
@@ -72,13 +75,26 @@ const MODULES = {
       "Internal Remarks": "flduyfC7TMj9iexV9",
       "Responsible Person": "fldx1JJdpsJ2YMiID",
       "Unit": "fldcfaKvLsKHYqOYk",
-      "Internal Code": "fld6qQuy0SSDmW5Xs",
+      "Product Code": "fld6qQuy0SSDmW5Xs",
       "Review Frequency": "fldLDJ6PHCJDgckGq",
       "Status": "fldpSbpbNDsz7ecTV",
+      // Storage profile (v2.0) — merged into the Storage tab.
+      "Cabinet": "fldLINsEoVfTYRGlO",
+      "Maximum Quantity": "fldvwU3V2KBE0LU3M",
+      "Storage Method": "fldy9CpjZcC3aj4qv",
+      "Temperature": "fldtB01TGuQmVIdxf",
+      "Ventilation": "fldhnHmiGDIP7OkD0",
+      "Segregation": "fldOwt4D9dZa1RToh",
+      "Incompatible Chemicals": "fldUXOJcvklmFrZ9k",
+      // Conditional-module flags (v2.0) — manual, assessor-set.
+      "Exposure Monitoring Required": "fld7Mas3ys7hROEDm",
+      "LEV Required": "fld0wB7ebUCXrQX9S",
+      "Biological Monitoring Required": "fldN3Or0Gzc5867z5",
+      "Health Surveillance Required": "fldofE2agyQ8ZdT6l",
     },
     dateKeys: [],
-    textareaKeys: ["PPE Requirement", "Notes", "Control Measures", "PPE Actually Used", "Internal Remarks"],
-    listColumns: ["Chemical Name", "Storage Location", "Hazard Classification", "Status"],
+    textareaKeys: ["PPE Requirement", "Notes", "Control Measures", "PPE Actually Used", "Internal Remarks", "Segregation", "Incompatible Chemicals"],
+    listColumns: ["Product Name", "Storage Location", "Hazard Classification", "Status"],
     complianceFieldId: null,
     attachments: [
       { key: "sds", fieldId: "fld8Ea2Jt7YFQeFjo", label: "SDS (Safety Data Sheet)" },

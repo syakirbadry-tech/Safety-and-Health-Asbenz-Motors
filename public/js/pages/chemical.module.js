@@ -38,9 +38,44 @@ const CHEMICAL_MODULE = defineBusinessModule({
   ],
   headerSubtitleFields: ["Storage Location", "CAS Number"],
 
-  dashboardSubTabOrder: ["sdsDocuments", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
+  dashboardSubTabOrder: ["sdsDocuments", "substances", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
 
   subTables: {
+    substances: {
+      title: "Substances",
+      api: "/substances",
+      primary: "chemicalName",
+      parentFieldKey: "chemical",
+      fields: {
+        chemicalName: "fldkqn3fqY9TzbmUG",
+        chemical: "fld7NOShCSTJX9NC3",
+        casNumber: "fldwMdQhjd0fTwhDz",
+        ecNumber: "fldNMjQm1gZGvJWuw",
+        reachNumber: "fld0y9wOY6ROj308B",
+        concentration: "fldkWme41Ajo3cHCf",
+        hazardClassification: "fldDxlPCKzqFmSraV",
+        signalWord: "fldYHffBOrgGVJ8KL",
+        hStatements: "fld5ToAescr6NayoO",
+        pStatements: "fldqRmM90GZcIW4uN",
+      },
+      // GHS Pictograms (multipleSelects) isn't listed here, same reason as
+      // SDS Documents: the generic sub-record form only handles
+      // single-value fields. It's set by the wizard's bulk-create from the
+      // AI's per-ingredient extraction and viewable/editable directly in
+      // Airtable if ever needed.
+      formMeta: {
+        labels: {
+          chemicalName: "Chemical Name", casNumber: "CAS Number", ecNumber: "EC Number", reachNumber: "REACH Number",
+          concentration: "Concentration", hazardClassification: "Hazard Classification", signalWord: "Signal Word",
+          hStatements: "H Statements", pStatements: "P Statements",
+        },
+        dateKeys: [],
+        selectOptions: { signalWord: ["Danger", "Warning", "None"] },
+        textareaKeys: ["hazardClassification", "hStatements", "pStatements"],
+      },
+      listColumns: ["casNumber", "concentration", "signalWord"],
+      countLabel: "Substances Identified",
+    },
     sdsDocuments: {
       title: "SDS Documents",
       api: "/sds-documents",
@@ -244,6 +279,7 @@ const CHEMICAL_MODULE = defineBusinessModule({
   // an obvious "merged timeline" (each is its own confirmed event).
   profileSubTabs: [
     { subKey: "sdsDocuments", tabKey: "sds", label: "SDS Library", emptyNoun: "SDS revisions" },
+    { subKey: "substances", tabKey: "substances", label: "Substances", emptyNoun: "substances" },
     { subKey: "exposureMonitoring", tabKey: "exposure", label: "Exposure Monitoring", emptyNoun: "exposure monitoring records" },
     { subKey: "storageInspection", tabKey: "storage", label: "Storage Inspection", emptyNoun: "storage inspections" },
     { subKey: "labelInspection", tabKey: "label", label: "Label Inspection", emptyNoun: "label inspections" },
@@ -367,6 +403,10 @@ const CHEMICAL_STATUS_OPTIONS = ["Active", "Under Review", "Inactive", "Disconti
 // only handles single-value inputs) — only the wizard writes these two.
 const SDS_GHS_PICTOGRAMS_FIELD_ID = "fldxiPyErIqlC2r8O";
 const SDS_EXTRACTED_BY_AI_FIELD_ID = "fldGo4nMa2PpHMD3W";
+// Not exposed via subTables.substances.fields for the same reason as above
+// (multipleSelects, generic sub-record form only handles single-value
+// inputs) — only the wizard's per-substance bulk-create writes this.
+const SDS_GHS_PICTOGRAMS_FIELD_ID_SUBSTANCE = "fldjxcnz8orvmo7gr";
 
 function openAddChemicalWizard() {
   modalTouchesModulePath = CHEMICAL_MODULE.basePath;
@@ -488,6 +528,30 @@ function guessHazardCategory(text) {
   return HAZARD_CATEGORY_OPTIONS.find((cat) => cat !== "Other" && t.includes(cat.toLowerCase())) || "";
 }
 
+function substancesPreviewHtml(substances) {
+  const list = Array.isArray(substances) ? substances.filter((sub) => sub && sub.name) : [];
+  if (!list.length) {
+    return `<p class="text-dim" style="font-size:12.5px;margin-top:6px;">No Section 3 ingredients were read from this SDS. You can add substances manually afterward from the Substances tab.</p>`;
+  }
+  return `
+    <div class="table-wrap" style="margin-top:8px;">
+      <table class="dosh-table">
+        <thead><tr><th>Chemical Name</th><th>CAS No.</th><th>Concentration</th><th>Signal Word</th></tr></thead>
+        <tbody>
+          ${list.map((sub) => `
+            <tr>
+              <td>${escapeHtml(sub.name || "—")}</td>
+              <td>${escapeHtml(sub.casNumber || "—")}</td>
+              <td>${escapeHtml(sub.concentration || "—")}</td>
+              <td>${escapeHtml(sub.signalWord || "—")}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-dim" style="font-size:11.5px;margin-top:6px;">Read from SDS Section 3 — will be saved as Substances records linked to this chemical. Review/edit them afterward from the Substances tab.</p>
+  `;
+}
+
 function renderWizardStep2(file, s) {
   modalTitle.textContent = "Add Chemical — Review";
   const guessedCategory = guessHazardCategory(s.hazardClassification);
@@ -497,8 +561,8 @@ function renderWizardStep2(file, s) {
     <p class="text-dim" style="font-size:13px;margin-bottom:14px;">Step 2 of 2 — Fields marked <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span> were read from the SDS; check them before saving. Anything the AI couldn't read is left blank below. Then complete the workplace information.</p>
     <div class="section-head" style="margin-top:0;"><h2 style="font-size:14px;">From the SDS</h2></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
-      ${wizField("wz_chemicalName", "Chemical Name", { value: s.chemicalName, aiPopulated: !!s.chemicalName })}
-      ${wizField("wz_productName", "Product Name", { value: s.productName, aiPopulated: !!s.productName })}
+      ${wizField("wz_productName", "Product Name", { value: s.productName || s.chemicalName, aiPopulated: !!(s.productName || s.chemicalName) })}
+      ${wizField("wz_chemicalNameInfo", "Chemical Name (informational — see Substances below)", { value: s.chemicalName, aiPopulated: !!s.chemicalName })}
       ${wizField("wz_manufacturer", "Manufacturer", { value: s.manufacturer, aiPopulated: !!s.manufacturer })}
       ${wizField("wz_supplier", "Supplier", { value: s.supplier, aiPopulated: !!s.supplier })}
       ${wizField("wz_casNumber", "CAS Number", { value: s.casNumber, aiPopulated: !!s.casNumber })}
@@ -531,17 +595,31 @@ function renderWizardStep2(file, s) {
     ${wizField("wz_exposureLimits", "Exposure Limits", { value: s.exposureLimits, rows: 2, aiPopulated: !!s.exposureLimits })}
     ${wizField("wz_transportInformation", "Transport Information", { value: s.transportInformation, rows: 2, aiPopulated: !!s.transportInformation })}
 
+    <div class="section-head"><h2 style="font-size:14px;">Substances (SDS Section 3)</h2></div>
+    ${substancesPreviewHtml(s.substances)}
+
     <div class="section-head"><h2 style="font-size:14px;">Workplace Information</h2></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
       ${wizField("wz_storageLocation", "Storage Location")}
       ${wizField("wz_department", "Department")}
       ${wizField("wz_responsiblePerson", "Responsible Person")}
-      ${wizField("wz_quantity", "Quantity")}
+      ${wizField("wz_quantity", "Current Quantity")}
+      ${wizField("wz_maximumQuantity", "Maximum Quantity")}
       ${wizField("wz_unit", "Unit (e.g. kg, L, m³)")}
-      ${wizField("wz_internalCode", "Internal Code")}
+      ${wizField("wz_internalCode", "Product Code")}
       ${wizSelect("wz_reviewFrequency", "Review Frequency", REVIEW_FREQUENCY_OPTIONS, "")}
       ${wizSelect("wz_status", "Status", CHEMICAL_STATUS_OPTIONS, "Active")}
     </div>
+
+    <div class="section-head"><h2 style="font-size:14px;">Storage Profile</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+      ${wizField("wz_cabinet", "Cabinet")}
+      ${wizField("wz_storageMethod", "Storage Method", { value: s.storageRequirements, aiPopulated: !!s.storageRequirements })}
+      ${wizField("wz_temperature", "Temperature")}
+      ${wizField("wz_ventilation", "Ventilation")}
+    </div>
+    ${wizField("wz_segregation", "Segregation", { rows: 2 })}
+    ${wizField("wz_incompatibleChemicals", "Incompatible Chemicals", { rows: 2 })}
 
     <div class="section-head"><h2 style="font-size:14px;">Additional Details <span class="text-dim" style="font-weight:400;font-size:11.5px;">(used in the DOSH Chemical Register)</span></h2></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
@@ -578,17 +656,18 @@ async function saveWizard(file, suggestion) {
     const CF = MODULES.chemicals.fields;
     const chemFields = {};
     const put = (fieldId, val) => { if (val !== "" && val != null) chemFields[fieldId] = val; };
-    put(CF["Chemical Name"], wv("wz_chemicalName"));
+    put(CF["Product Name"], wv("wz_productName"));
     put(CF["CAS Number"], wv("wz_casNumber"));
     put(CF["Supplier"], wv("wz_supplier"));
     put(CF["Storage Location"], wv("wz_storageLocation"));
     put(CF["Hazard Classification"], wv("wz_hazardCategory"));
-    put(CF["Quantity"], wv("wz_quantity"));
+    put(CF["Current Quantity"], wv("wz_quantity"));
+    put(CF["Maximum Quantity"], wv("wz_maximumQuantity"));
     put(CF["Unit"], wv("wz_unit"));
     put(CF["Exposure Limit"], wv("wz_exposureLimits"));
     put(CF["Department"], wv("wz_department"));
     put(CF["Responsible Person"], wv("wz_responsiblePerson"));
-    put(CF["Internal Code"], wv("wz_internalCode"));
+    put(CF["Product Code"], wv("wz_internalCode"));
     put(CF["Review Frequency"], wv("wz_reviewFrequency"));
     put(CF["Status"], wv("wz_status") || "Active");
     put(CF["Process"], wv("wz_process"));
@@ -598,9 +677,15 @@ async function saveWizard(file, suggestion) {
     put(CF["PPE Actually Used"], wv("wz_ppeActuallyUsed"));
     put(CF["Type of Use"], wv("wz_typeOfUse"));
     put(CF["Internal Remarks"], wv("wz_internalRemarks"));
+    put(CF["Cabinet"], wv("wz_cabinet"));
+    put(CF["Storage Method"], wv("wz_storageMethod"));
+    put(CF["Temperature"], wv("wz_temperature"));
+    put(CF["Ventilation"], wv("wz_ventilation"));
+    put(CF["Segregation"], wv("wz_segregation"));
+    put(CF["Incompatible Chemicals"], wv("wz_incompatibleChemicals"));
 
-    if (!chemFields[CF["Chemical Name"]]) {
-      toast("Chemical Name is required.", true);
+    if (!chemFields[CF["Product Name"]]) {
+      toast("Product Name is required.", true);
       btn.disabled = false;
       btn.textContent = "Save Chemical";
       return;
@@ -616,7 +701,7 @@ async function saveWizard(file, suggestion) {
     // the AI couldn't read one, so the very first SDS for a new chemical is
     // always explicitly versioned rather than left blank.
     const sdsVersion = wv("wz_sdsVersion") || "1";
-    putS(SF.sdsReference, `${wv("wz_productName") || wv("wz_chemicalName") || "SDS"} v${sdsVersion}`);
+    putS(SF.sdsReference, `${wv("wz_productName") || "SDS"} v${sdsVersion}`);
     sdsFields[SF.chemical] = [chemical.id];
     putS(SF.productName, wv("wz_productName"));
     putS(SF.manufacturer, wv("wz_manufacturer"));
@@ -646,7 +731,33 @@ async function saveWizard(file, suggestion) {
     const sdsRecord = await CHEMICAL_MODULE._services.sub.sdsDocuments.create(sdsFields);
     await CHEMICAL_MODULE._services.sub.sdsDocuments.upload(sdsRecord.id, "file", file);
 
-    toast("Chemical added and SDS saved.");
+    // Bulk-create Substances records from the SDS's Section 3 extraction,
+    // linked to the new chemical. Best-effort: a substance create failing
+    // shouldn't undo the chemical/SDS that already saved successfully — the
+    // user can add substances manually from the Substances tab afterward.
+    const SubF = CHEMICAL_MODULE.subTables.substances.fields;
+    const substances = Array.isArray(suggestion?.substances) ? suggestion.substances.filter((sub) => sub && sub.name) : [];
+    for (const sub of substances) {
+      try {
+        const subFields = { [SubF.chemical]: [chemical.id] };
+        const putSub = (fieldId, val) => { if (val !== "" && val != null) subFields[fieldId] = val; };
+        putSub(SubF.chemicalName, sub.name);
+        putSub(SubF.casNumber, sub.casNumber);
+        putSub(SubF.ecNumber, sub.ecNumber);
+        putSub(SubF.reachNumber, sub.reachNumber);
+        putSub(SubF.concentration, sub.concentration);
+        putSub(SubF.hazardClassification, sub.hazardClassification);
+        putSub(SubF.signalWord, sub.signalWord);
+        putSub(SubF.hStatements, sub.hStatements);
+        putSub(SubF.pStatements, sub.pStatements);
+        if (Array.isArray(sub.ghsPictograms) && sub.ghsPictograms.length) subFields[SDS_GHS_PICTOGRAMS_FIELD_ID_SUBSTANCE] = sub.ghsPictograms;
+        await CHEMICAL_MODULE._services.sub.substances.create(subFields);
+      } catch (err) {
+        console.error("Could not save a substance from SDS Section 3:", err);
+      }
+    }
+
+    toast(substances.length ? `Chemical added, SDS saved, and ${substances.length} substance(s) recorded.` : "Chemical added and SDS saved.");
     closeModal();
   } catch (err) {
     toast(err.message, true);

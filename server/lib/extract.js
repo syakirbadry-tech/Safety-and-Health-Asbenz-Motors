@@ -16,7 +16,7 @@ console.log(`Using Gemini model: ${MODEL}`);
 // schemas change shape — lets AI Extraction Logs correlate a run's output
 // quality with the exact prompt that produced it.
 const LICENSE_PROMPT_VERSION = "license-v1";
-const SDS_PROMPT_VERSION = "sds-v1";
+const SDS_PROMPT_VERSION = "sds-v2"; // v2 adds Section 3 substances[] extraction
 
 console.log({
   model: MODEL,
@@ -162,8 +162,20 @@ const SDS_EXTRACTION_PROMPT = `You are reading a Safety Data Sheet (SDS) for an 
 - exposureLimits: occupational exposure limits (e.g. PEL/TLV values), if stated
 - unNumber: the UN transport number, if present
 - transportInformation: a summary of transport classification/requirements
+- substances: an array of every hazardous ingredient listed in SDS Section 3 (Composition/Information on Ingredients). For each ingredient, extract:
+  - name: the chemical name per Section 3 (this is distinct from productName above — it's the ingredient's own identity, e.g. "Toluene", not the trade name of the overall product)
+  - casNumber: the CAS Registry Number for this ingredient
+  - ecNumber: the EC (EINECS) number for this ingredient, if present
+  - reachNumber: the REACH registration number for this ingredient, if present
+  - concentration: the concentration or concentration range as stated, e.g. "10-20%"
+  - hazardClassification: this ingredient's GHS hazard classification(s), if stated per-ingredient
+  - signalWord: exactly "Danger", "Warning", or "None", if stated per-ingredient
+  - hStatements: this ingredient's H statements, if stated per-ingredient
+  - pStatements: this ingredient's P statements, if stated per-ingredient
+  - ghsPictograms: an array using only the same 9 exact values as above, if stated per-ingredient
+  Only include ingredients Section 3 actually lists — an empty array if Section 3 isn't present or lists nothing extractable.
 
-If a field isn't visible or you're not confident about it, use null for that field (or an empty array for ghsPictograms) rather than guessing — never invent a value.`;
+If a field isn't visible or you're not confident about it, use null for that field (or an empty array for ghsPictograms/substances) rather than guessing — never invent a value.`;
 
 const SDS_RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -190,6 +202,24 @@ const SDS_RESPONSE_SCHEMA = {
     exposureLimits: { type: "STRING", nullable: true },
     unNumber: { type: "STRING", nullable: true },
     transportInformation: { type: "STRING", nullable: true },
+    substances: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING", nullable: true },
+          casNumber: { type: "STRING", nullable: true },
+          ecNumber: { type: "STRING", nullable: true },
+          reachNumber: { type: "STRING", nullable: true },
+          concentration: { type: "STRING", nullable: true },
+          hazardClassification: { type: "STRING", nullable: true },
+          signalWord: { type: "STRING", nullable: true },
+          hStatements: { type: "STRING", nullable: true },
+          pStatements: { type: "STRING", nullable: true },
+          ghsPictograms: { type: "ARRAY", items: { type: "STRING" } },
+        },
+      },
+    },
   },
 };
 
