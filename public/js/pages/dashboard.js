@@ -17,8 +17,16 @@ Router.register("/", async () => {
     </div>
     ${Components.sectionHead("Modules", "Tap a tile to open its dashboard")}
     <div class="grid" id="businessGrid"></div>
-    ${Components.sectionHead("Compliance Overview")}
+    ${Components.sectionHead("Compliance Overview", "Machinery")}
     <div id="dashboardKpis"><div class="page-loading">Loading…</div></div>
+    ${Components.sectionHead("Compliance Overview", "Chemical Management")}
+    <div id="dashboardKpisChemical"><div class="page-loading">Loading…</div></div>
+    ${Components.sectionHead("Corrective Actions (CAPA)")}
+    <div id="dashboardKpisActions"><div class="page-loading">Loading…</div></div>
+    ${Components.sectionHead("OSH Committee")}
+    <div id="dashboardKpisCommittee"><div class="page-loading">Loading…</div></div>
+    <div class="section-head" style="margin-top:34px;"><h2>Open Corrective Actions</h2></div>
+    <div id="dashboardOpenActions"><div class="page-loading">Loading…</div></div>
     <div class="section-head" style="margin-top:34px;"><h2>Recent Activity</h2></div>
     <div id="dashboardActivity"><div class="page-loading">Loading…</div></div>
   `;
@@ -53,14 +61,125 @@ Router.register("/", async () => {
     const openCm = cm.filter((r) => r.fields[cmF.status] !== "Resolved").length;
 
     kpiEl.innerHTML = Components.kpiRow([
-      { label: "Registered Machines", value: machines.length, tone: "neutral" },
-      { label: "CF Expiring/Expired (30d)", value: expiringCf, tone: expiringCf ? "warn" : "ok" },
-      { label: "Open Corrective Maintenance", value: openCm, tone: openCm ? "bad" : "ok" },
-      { label: "Preventive Maintenance Logged", value: pm.length, tone: "neutral" },
+      { label: "Registered Machines", value: machines.length, tone: "neutral", navigate: "/machinery/register" },
+      { label: "CF Expiring/Expired (30d)", value: expiringCf, tone: expiringCf ? "warn" : "ok", navigate: "/machinery/register" },
+      { label: "Open Corrective Maintenance", value: openCm, tone: openCm ? "bad" : "ok", navigate: "/machinery/register" },
+      { label: "Preventive Maintenance Logged", value: pm.length, tone: "neutral", navigate: "/machinery/register" },
     ]);
   } catch (err) {
     console.error(err);
     kpiEl.innerHTML = Components.emptyState("Could not load the compliance overview.");
+  }
+
+  // Chemical Management — same hand-rolled per-module fetch shape as
+  // Machinery above; a shared cross-module KPI abstraction isn't worth
+  // building until a third module needs the exact same shape again.
+  const chemKpiEl = document.getElementById("dashboardKpisChemical");
+  try {
+    const chemSvc = CHEMICAL_MODULE._services;
+    const [chemicals, sdsDocs, storageInsp] = await Promise.all([
+      chemSvc.master.list(),
+      chemSvc.sub.sdsDocuments.list(),
+      chemSvc.sub.storageInspection.list(),
+    ]);
+    const sdsF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
+    const storageF = CHEMICAL_MODULE.subTables.storageInspection.fields;
+    const expiredSds = sdsDocs.filter(
+      (r) => r.fields[sdsF.status] === "Current" && clientSdsExpiryStatus(r.fields[sdsF.expiryDate]) === "Expired"
+    ).length;
+    const storageDue = storageInsp.filter((r) => {
+      const d = daysUntil(r.fields[storageF.nextDue]);
+      return d !== null && d <= 30;
+    }).length;
+
+    chemKpiEl.innerHTML = Components.kpiRow([
+      { label: "Registered Chemicals", value: chemicals.length, tone: "neutral", navigate: "/chemical/register" },
+      { label: "Expired SDS", value: expiredSds, tone: expiredSds ? "bad" : "ok", navigate: "/chemical/register" },
+      { label: "Storage Inspections Due (30d)", value: storageDue, tone: storageDue ? "warn" : "ok", navigate: "/chemical/register" },
+    ]);
+  } catch (err) {
+    console.error(err);
+    chemKpiEl.innerHTML = Components.emptyState("Could not load the Chemical Management overview.");
+  }
+
+  // Corrective Actions/CAPA — also feeds the "Open Corrective Actions"
+  // mini-table below, so the record list is fetched once and reused.
+  const actionsKpiEl = document.getElementById("dashboardKpisActions");
+  const openActionsEl = document.getElementById("dashboardOpenActions");
+  let actionRecords = [];
+  try {
+    actionRecords = await ACTION_MODULE._services.master.list();
+    const F = MODULES.actions.fields;
+    const open = actionRecords.filter((r) => !["Completed", "Cancelled"].includes(r.fields[F.Status]));
+    const overdue = open.filter((r) => {
+      const due = r.fields[F["Due Date"]];
+      return due && new Date(due) < new Date();
+    });
+    const capaOpen = open.filter((r) => ["Corrective", "Preventive"].includes(r.fields[F["Action Type"]]));
+
+    actionsKpiEl.innerHTML = Components.kpiRow([
+      { label: "Open Actions", value: open.length, tone: open.length ? "warn" : "ok", navigate: "/capa/register" },
+      { label: "Overdue Actions", value: overdue.length, tone: overdue.length ? "bad" : "ok", navigate: "/capa/register" },
+      { label: "CAPA Open", value: capaOpen.length, tone: capaOpen.length ? "warn" : "ok", navigate: "/capa/register" },
+    ]);
+
+    const topOverdue = overdue
+      .slice()
+      .sort((a, b) => new Date(a.fields[F["Due Date"]]) - new Date(b.fields[F["Due Date"]]))
+      .slice(0, 5);
+    if (!topOverdue.length) {
+      openActionsEl.innerHTML = Components.emptyState("No overdue actions — nice work.");
+    } else {
+      openActionsEl.innerHTML = Components.dataTable({
+        columns: [
+          { key: "title", label: "Title" },
+          { key: "type", label: "Type" },
+          { key: "priority", label: "Priority" },
+          { key: "assignedTo", label: "Assigned To" },
+          { key: "source", label: "Source" },
+          { key: "due", label: "Due Date" },
+        ],
+        rows: topOverdue.map((r) => ({
+          navigate: `/capa/${r.id}`,
+          cells: {
+            title: `<strong>${escapeHtml(r.fields[F.Title] || "—")}</strong>`,
+            type: escapeHtml(r.fields[F["Action Type"]] || "—"),
+            priority: Components.statusPillFor(r.fields[F.Priority]),
+            assignedTo: escapeHtml(r.fields[F["Assigned To"]] || "—"),
+            source: escapeHtml(r.fields[F["Source Module"]] || "—"),
+            due: fmtDate(r.fields[F["Due Date"]]),
+          },
+        })),
+        emptyLabel: "No overdue actions.",
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    actionsKpiEl.innerHTML = Components.emptyState("Could not load the Corrective Actions overview.");
+    openActionsEl.innerHTML = Components.emptyState("Could not load open actions.");
+  }
+
+  // OSH Committee — membership count + soonest upcoming scheduled meeting.
+  const committeeKpiEl = document.getElementById("dashboardKpisCommittee");
+  try {
+    const [membersData, meetings] = await Promise.all([
+      api("/osh-committee-members"),
+      OSH_COMMITTEE_MODULE._services.master.list(),
+    ]);
+    const memberF = MODULES.oshCommitteeMembers.fields;
+    const meetingF = MODULES.oshCommitteeMeetings.fields;
+    const activeMembers = (membersData.records || []).filter((r) => r.fields[memberF.Status] === "Active").length;
+    const upcoming = meetings
+      .filter((r) => r.fields[meetingF.Status] === "Scheduled" && r.fields[meetingF["Meeting Date"]])
+      .sort((a, b) => new Date(a.fields[meetingF["Meeting Date"]]) - new Date(b.fields[meetingF["Meeting Date"]]))[0];
+
+    committeeKpiEl.innerHTML = Components.kpiRow([
+      { label: "Active Members", value: activeMembers, tone: "neutral", navigate: "/osh-committee/members" },
+      { label: "Next Scheduled Meeting", value: upcoming ? fmtDate(upcoming.fields[meetingF["Meeting Date"]]) : "None", tone: upcoming ? "neutral" : "warn", navigate: "/osh-committee/register" },
+    ]);
+  } catch (err) {
+    console.error(err);
+    committeeKpiEl.innerHTML = Components.emptyState("Could not load the OSH Committee overview.");
   }
 
   const activityEl = document.getElementById("dashboardActivity");
