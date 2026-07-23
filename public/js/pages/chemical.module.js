@@ -36,6 +36,11 @@ const CHEMICAL_MODULE = defineBusinessModule({
     "PPE Requirement", "Exposure Limit", "Process", "No. of Workers Exposed", "Type of Use",
     "Control Measures", "PPE Actually Used", "Notes", "Internal Remarks",
   ],
+  // Rendered after the fields grid above (General Information tab) — derived
+  // fields computed server-side by chemicals.js's postProcess hook
+  // (complianceSummary, generalInfo), not stored redundantly on Chemicals.
+  // See renderFwGeneralInfoDerived in moduleFramework.js.
+  generalInfoDerived: (profile) => CHEMICAL_MODULE_renderGeneralInfoDerived(profile),
   headerSubtitleFields: ["Storage Location", "CAS Number"],
 
   dashboardSubTabOrder: ["sdsDocuments", "substances", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
@@ -379,6 +384,56 @@ const CHEMICAL_MODULE = defineBusinessModule({
   // see the customAddHandler hook in framework/moduleFramework.js.
   customAddHandler: () => openAddChemicalWizard(),
 });
+
+// Missing Value Rules (v2.0 brief): a derived/AI-sourced field that has no
+// data shows a specific fallback rather than a bare "—", so the register and
+// profile read as deliberately assessed rather than incomplete.
+function naFallback(value, fallback) {
+  return value === null || value === undefined || value === "" ? fallback : value;
+}
+
+// Conditional module (LEV/Biological Monitoring/Health Surveillance) — no
+// dedicated table exists yet (future milestone, see PROJECT_ROADMAP.md), so
+// the tab only announces the module is required rather than showing a
+// broken list. Swapping this for a real sub-table later needs no redesign —
+// same pattern Chemical Management itself was built on.
+function conditionalModulePlaceholder(moduleName) {
+  return `<div class="empty-state">${escapeHtml(moduleName)} has been flagged as required for this chemical. This module isn't built yet — it's on the roadmap (see PROJECT_ROADMAP.md) and will slot in here without another redesign once it ships.</div>`;
+}
+
+// Rendered inside the General Information tab (config.generalInfoDerived),
+// from the complianceSummary/generalInfo chemicals.js's postProcess hook
+// attaches to the profile response — nothing here is fetched again.
+function CHEMICAL_MODULE_renderGeneralInfoDerived(profile) {
+  const cs = profile.complianceSummary || {};
+  const gi = profile.generalInfo || {};
+  const sds = gi.currentSds;
+
+  const sdsBlock = `
+    <div class="section-head"><h2 style="font-size:13px;">Current SDS</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">
+      <div class="field"><label>Current SDS</label><div style="padding:8px 0;font-size:13.5px;">${sds ? `Version ${escapeHtml(naFallback(sds.version, "—"))}` : "Not Available"}</div></div>
+      <div class="field"><label>Current SDS Status</label><div style="padding:8px 0;font-size:13.5px;">${gi.sdsExpiryStatus ? Components.statusPillFor(gi.sdsExpiryStatus) : "Not Available"}</div></div>
+      <div class="field"><label>Latest Revision</label><div style="padding:8px 0;font-size:13.5px;">${sds ? fmtDate(sds.revisionDate) : "Not Available"}</div></div>
+      <div class="field"><label>Manufacturer</label><div style="padding:8px 0;font-size:13.5px;">${escapeHtml(naFallback(sds?.manufacturer, "Not Available"))}</div></div>
+      <div class="field"><label>Physical Form</label><div style="padding:8px 0;font-size:13.5px;">${escapeHtml(naFallback(sds?.physicalForm, "Not Classified"))}</div></div>
+    </div>`;
+
+  const flag = (v) => Components.statusPillFor(v === "Yes" ? "Valid" : v === "No" ? "—" : v);
+  const complianceBlock = `
+    <div class="section-head"><h2 style="font-size:13px;">Compliance Summary</h2></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));">
+      <div class="field"><label>SDS Available</label><div style="padding:8px 0;">${cs.sdsAvailable ? Components.statusPillFor("Valid") : Components.statusPillFor("Expired")}</div></div>
+      <div class="field"><label>CHRA Completed</label><div style="padding:8px 0;">${cs.chraCompleted ? Components.statusPillFor("Valid") : Components.statusPillFor("Open")}</div></div>
+      <div class="field"><label>Exposure Monitoring Required</label><div style="padding:8px 0;">${flag(cs.exposureMonitoringRequired)}</div></div>
+      <div class="field"><label>LEV Required</label><div style="padding:8px 0;">${flag(cs.levRequired)}</div></div>
+      <div class="field"><label>Biological Monitoring Required</label><div style="padding:8px 0;">${flag(cs.biologicalMonitoringRequired)}</div></div>
+      <div class="field"><label>Health Surveillance Required</label><div style="padding:8px 0;">${flag(cs.healthSurveillanceRequired)}</div></div>
+      <div class="field"><label>Next Review</label><div style="padding:8px 0;font-size:13.5px;">${cs.nextReview ? fmtDate(cs.nextReview) : "Not Available"}</div></div>
+    </div>`;
+
+  return sdsBlock + complianceBlock;
+}
 
 // ---------------------------------------------------------------------
 // "+ Add Chemical" wizard — SDS-driven intake, upload-first by design:

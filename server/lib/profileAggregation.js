@@ -25,10 +25,15 @@ function filterLinkedTo(records, linkFieldId, parentId) {
 //   key         -> property name under `subTables` in the JSON response
 //   tableId     -> the sub-table's Airtable table ID
 //   linkFieldId -> the sub-table's linked-record field pointing back at the master record
+// postProcess: optional (result, master) => void, called just before res.json
+//   so a module can attach derived fields (compliance summaries, aggregated
+//   documents, ...) computed from data this route already fetched, without
+//   any extra Airtable calls. Mutates `result` in place. Omit it and nothing
+//   changes — existing callers (Machinery) are unaffected.
 //
 // Returns an Express handler for GET /:id/profile ->
 //   { master, subTables: { [key]: records[] }, activity: records[] }
-function buildProfileRoute({ masterTableId, masterNameFieldId, subTables, moduleName, logActivity }) {
+function buildProfileRoute({ masterTableId, masterNameFieldId, subTables, moduleName, logActivity, postProcess }) {
   return async function profileRoute(req, res) {
     const parentId = req.params.id;
     try {
@@ -48,6 +53,8 @@ function buildProfileRoute({ masterTableId, masterNameFieldId, subTables, module
       subTables.forEach((st, i) => {
         result.subTables[st.key] = filterLinkedTo(subTableResults[i], st.linkFieldId, parentId);
       });
+
+      if (postProcess) postProcess(result, master);
 
       res.json(result);
     } catch (err) {

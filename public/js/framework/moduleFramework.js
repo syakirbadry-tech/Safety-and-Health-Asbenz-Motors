@@ -427,7 +427,7 @@ async function renderProfilePage(config, params) {
   }
 
   const tabs = [
-    { key: "general", label: "General Information", render: () => renderFwGeneralInfoTab(config, record) },
+    { key: "general", label: "General Information", render: () => renderFwGeneralInfoTab(config, record, profile) },
     ...(config.historyTab
       ? [{ key: config.historyTab.key, label: config.historyTab.label, render: () => renderFwHistoryTab(config, profile), afterRender: bindSubHandlers }]
       : []),
@@ -466,7 +466,7 @@ async function renderProfilePage(config, params) {
   }
 }
 
-function renderFwGeneralInfoTab(config, record) {
+function renderFwGeneralInfoTab(config, record, profile) {
   const dateFieldLabels = new Set(MODULES[config.modulesKey].dateKeys);
   const cells = config.generalInfoFields
     .map((label) => {
@@ -479,7 +479,11 @@ function renderFwGeneralInfoTab(config, record) {
   const complianceHtml = complianceFieldId
     ? `<div class="field" style="margin-top:10px;"><label>Compliance Status (auto)</label>${Components.statusPillFor(record.fields[complianceFieldId])}</div>`
     : "";
-  return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">${cells}</div>${complianceHtml}`;
+  // Optional hook: derived/computed fields a module's postProcess attached
+  // to the profile response (compliance summaries, current-SDS status, ...)
+  // rendered after the plain fields grid above — see chemical.module.js.
+  const derivedHtml = config.generalInfoDerived ? config.generalInfoDerived(profile) : "";
+  return `<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">${cells}</div>${complianceHtml}${derivedHtml}`;
 }
 
 function renderFwHistoryTab(config, profile) {

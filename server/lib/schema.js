@@ -173,6 +173,22 @@ module.exports = {
       internalCode: "fld6qQuy0SSDmW5Xs", // display name "Product Code"
       reviewFrequency: "fldLDJ6PHCJDgckGq",
       status: "fldpSbpbNDsz7ecTV",
+      // Storage profile (v2.0) — merges into the Storage tab alongside
+      // Chemical Storage Inspection's history list.
+      cabinet: "fldLINsEoVfTYRGlO",
+      maximumQuantity: "fldvwU3V2KBE0LU3M",
+      storageMethod: "fldy9CpjZcC3aj4qv",
+      temperature: "fldtB01TGuQmVIdxf",
+      ventilation: "fldhnHmiGDIP7OkD0",
+      segregation: "fldOwt4D9dZa1RToh",
+      incompatibleChemicals: "fldUXOJcvklmFrZ9k",
+      // Conditional-module flags (v2.0) — manual, assessor-set. Drive
+      // whether the Exposure Monitoring/LEV/Biological Monitoring/Health
+      // Surveillance tabs appear on a chemical's profile.
+      exposureMonitoringRequired: "fld7Mas3ys7hROEDm",
+      levRequired: "fld0wB7ebUCXrQX9S",
+      biologicalMonitoringRequired: "fldN3Or0Gzc5867z5",
+      healthSurveillanceRequired: "fldofE2agyQ8ZdT6l",
     },
   },
 
@@ -227,6 +243,9 @@ module.exports = {
       sdsFile: "fldwdrQQpzpboQZta",
       notes: "fldqoLMtuiHqYNs8x",
       extractedByAi: "fldGo4nMa2PpHMD3W",
+      // Formula field: Revision Date + 5 years. Time-based expiry, distinct
+      // from `status`'s Current/Superseded revision-history semantics.
+      expiryDate: "fldSYtv0CM9eDYBAz",
     },
   },
 

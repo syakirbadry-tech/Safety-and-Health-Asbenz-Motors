@@ -38,12 +38,62 @@ router.post("/extract-sds-preview", upload.single("file"), async (req, res) => {
   }
 });
 
+// Time-based SDS status, distinct from SDS Documents' own `status` field
+// (Current/Superseded — revision history). Derived from the Expiry Date
+// formula field (Revision Date + 5 years) at read time, same "compute, don't
+// store" pattern as the DOSH register's CSDS/Label flags below.
+const SDS_EXPIRING_SOON_DAYS = 90;
+function sdsExpiryStatus(expiryDateStr) {
+  if (!expiryDateStr) return null;
+  const daysLeft = (new Date(expiryDateStr) - new Date()) / (1000 * 60 * 60 * 24);
+  if (daysLeft < 0) return "Expired";
+  if (daysLeft <= SDS_EXPIRING_SOON_DAYS) return "Expiring Soon";
+  return "Current";
+}
+
+function pickCurrentSds(sdsDocumentsRecords) {
+  const SF = schema.sdsDocuments.fields;
+  const current = (sdsDocumentsRecords || []).filter((r) => r.fields[SF.status] === "Current");
+  if (!current.length) return null;
+  return current.sort((a, b) => new Date(b.fields[SF.revisionDate] || 0) - new Date(a.fields[SF.revisionDate] || 0))[0];
+}
+
+function buildComplianceSummary(master, subTables) {
+  const CF = schema.chemicals.fields;
+  const CHF = schema.chra.fields;
+  const currentSds = pickCurrentSds(subTables.sdsDocuments);
+  const upcomingReviews = (subTables.chra || [])
+    .map((r) => r.fields[CHF.reviewDueDate])
+    .filter(Boolean)
+    .sort((a, b) => new Date(a) - new Date(b));
+
+  return {
+    sdsAvailable: !!currentSds,
+    chraCompleted: (subTables.chra || []).length > 0,
+    exposureMonitoringRequired: master.fields[CF.exposureMonitoringRequired] || "Not Assessed",
+    levRequired: master.fields[CF.levRequired] || "Not Assessed",
+    biologicalMonitoringRequired: master.fields[CF.biologicalMonitoringRequired] || "Not Assessed",
+    healthSurveillanceRequired: master.fields[CF.healthSurveillanceRequired] || "Not Assessed",
+    nextReview: upcomingReviews[0] || null,
+  };
+}
+
+function buildGeneralInfoDerived(subTables) {
+  const SF = schema.sdsDocuments.fields;
+  const currentSds = pickCurrentSds(subTables.sdsDocuments);
+  return {
+    currentSds: currentSds ? { id: currentSds.id, version: currentSds.fields[SF.sdsVersion], revisionDate: currentSds.fields[SF.revisionDate], manufacturer: currentSds.fields[SF.manufacturer], physicalForm: currentSds.fields[SF.physicalForm] } : null,
+    sdsExpiryStatus: currentSds ? sdsExpiryStatus(currentSds.fields[SF.expiryDate]) : null,
+  };
+}
+
 // GET /:id/profile — mirrors Machinery's aggregation endpoint (built from the
 // same generic framework), keyed by the sub-table names the frontend's
 // chemical.module.js config expects: exposureMonitoring, storageInspection,
 // labelInspection, wasteManagement, sdsDocuments, training, chra (CHRA reused
 // as the risk-assessment tab, same pattern as HIRARC for Machinery),
-// substances (Section 3 ingredients).
+// substances (Section 3 ingredients). postProcess attaches complianceSummary
+// and generalInfo (derived) — see helpers above.
 router.get(
   "/:id/profile",
   buildProfileRoute({
@@ -61,6 +111,10 @@ router.get(
       { key: "chra", tableId: schema.chra.tableId, linkFieldId: schema.chra.fields.chemicalLink },
       { key: "substances", tableId: schema.substances.tableId, linkFieldId: schema.substances.fields.chemical },
     ],
+    postProcess: (result, master) => {
+      result.complianceSummary = buildComplianceSummary(master, result.subTables);
+      result.generalInfo = buildGeneralInfoDerived(result.subTables);
+    },
   })
 );
 
