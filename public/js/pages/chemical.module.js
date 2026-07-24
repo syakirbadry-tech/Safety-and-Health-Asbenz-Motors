@@ -53,7 +53,7 @@ const CHEMICAL_MODULE = defineBusinessModule({
     // instead of the single flat set of those fields on the Chemicals master
     // record. The wizard still writes the flat fields (unchanged, backward
     // compatible) and additionally creates the first record here, marked
-    // primary. See DOSH_REGISTER_FIELD_MAPPING.md and ARCHITECTURE.md §5.2.2.
+    // primary. See DOSH_REGISTER_FIELD_MAPPING.md and ARCHITECTURE.md §5.2.5.
     processUsage: {
       title: "Process Usage",
       api: "/chemical-process-usage",

@@ -3,7 +3,7 @@
 // Chemical Profile page (single-chemical badge + missing-fields checklist),
 // the Register list's "Requires Attention" filter, and the dashboard
 // completion widgets — see DOSH_REGISTER_FIELD_MAPPING.md and
-// ARCHITECTURE.md §5.2.2. Pure function, no Airtable calls of its own —
+// ARCHITECTURE.md §5.2.5. Pure function, no Airtable calls of its own —
 // callers already have this data from their own aggregation.
 
 // A chemical's Process Usage is "complete" if at least one linked usage

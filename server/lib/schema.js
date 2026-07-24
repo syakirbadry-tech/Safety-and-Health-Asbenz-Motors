@@ -201,7 +201,7 @@ module.exports = {
   // Chemicals' own flat process/quantity/workersExposed/controlMeasures/
   // ppeActuallyUsed/typeOfUse fields, which remain the source of truth for a
   // chemical with zero linked usage records here (see DOSH_REGISTER_FIELD_MAPPING.md
-  // and ARCHITECTURE.md §5.2.2). A chemical used across multiple processes
+  // and ARCHITECTURE.md §5.2.5). A chemical used across multiple processes
   // gets one Chemical Process Usage record per process, each with its own
   // quantity/workers-exposed/controls/PPE/type-of-use.
   chemicalProcessUsage: {
