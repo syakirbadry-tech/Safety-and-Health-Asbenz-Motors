@@ -138,7 +138,7 @@ Two reference configs exist: `public/js/pages/machinery.module.js` (the original
 Chemical Management is deliberately split into two layers, per the DOSH "Guidelines for the Preparation of a Chemical Register" (USECHH Regulations 2000):
 
 - **Layer 1 — the operational system.** The module framework's usual Dashboard/Register/Profile pages, plus the SDS-driven "+ Add Chemical" wizard and a versioned `SDS Documents` table (§3.4.2 of DATABASE.md) — this is the daily working interface.
-- **Layer 2 — DOSH compliance.** A generated, read-only report (`/chemical/dosh-register`) that reproduces the guidance document's Section A (Company Information) / Section B (per-chemical hazard-and-usage table) / Section C (Prepared By/Reviewed By) layout entirely from Layer 1 data — nothing is filled in twice. `GET /api/chemicals/reports/dosh-register-data` aggregates it server-side, including two flags computed at request time rather than stored (CSDS Y/N, Label Y/N), since both already exist elsewhere in the system. The browser's native "Print to PDF" produces the actual file — no server-side PDF-generation dependency was added.
+- **Layer 2 — DOSH compliance.** A generated, read-only report (`/chemical/dosh-register`) that reproduces the guidance document's Section A (Company Information) / Section B (per-**Substance** hazard-and-usage table, v2.1 — one row per linked Substance, not per Chemical, see DATABASE.md §3.4.4) / Section C (Prepared By/Reviewed By) layout entirely from Layer 1 data — nothing is filled in twice. `GET /api/chemicals/reports/dosh-register-data` aggregates it server-side, including several values computed at request time rather than stored (CSDS Y/N, Label Y/N, Type# code, Class) since all already exist elsewhere in the system. The browser's native "Print to PDF" produces the PDF — no server-side PDF-generation dependency. Excel export (v2.1) is a real formatted `.xlsx` built client-side with ExcelJS, lazy-loaded from a CDN on first click — the app's one deliberate exception to "no new dependency," scoped entirely to this report; every other export in the app (including the Chemical Register's own "Export Excel") stays plain client-side CSV.
 
 SDS revisions are never overwritten: `server/routes/sdsDocuments.js` intercepts record creation so that saving a new revision as the Current one automatically flips any prior Current revision(s) for that chemical to Superseded, preserving full history — the one route in the app where the generic `buildModuleRouter` factory's default create behavior wasn't reusable as-is (see the code comment there for why).
 
@@ -188,14 +188,23 @@ Each remaining compliance module still follows the original architectural patter
 
 ### 5.4 Admin capability layer
 
-The Admin layer provides governance control for:
+`public/admin.html`/`public/js/admin.js` — a tab-based page, deliberately independent of the SPA router (§3.1), providing governance control for:
 
-- User onboarding and role assignment
-- Temporary password management
-- Access control review
-- Activity history review
-- Backup and bulk import/export of module data
-- System health monitoring
+- **Data Browser** — a dense, spreadsheet-style editable grid over every module in `MODULES` (`modules.config.js`); reuses each module's existing CRUD routes, no separate data-access code.
+- **Users & Roles** — onboarding, role assignment, temporary password management, account status.
+- **Company Profile** (v2.1) — see §5.5.
+- **Login & Activity History** — the full audit trail (DATABASE.md §3.2), filterable by action type, including a red-highlighted "Error" filter.
+- **Settings** — a system-health snapshot (errors/failed logins in the last 24h, active users, total records) plus per-module JSON export and bulk import (append or typed-confirmation wipe-and-replace).
+
+### 5.5 Company Profile — platform-wide shared module (v2.1)
+
+A reusable "single source of truth" for company information, built to be consumed by every current and future generated report (DOSH Chemical Register today; Noise, Machinery, CAPA, and Committee reports read the same table as they add their own) — not a Chemical-Management-specific feature, even though it grew out of the DOSH register's Section A.
+
+- **Not built on the module framework.** Company Settings is a single-row table, not a register of many records, so `defineBusinessModule`'s Dashboard/Register/Profile shape doesn't fit — it's a form, not a workspace. Instead it lives as a new tab in the existing Admin panel (§5.4), reusing the Admin panel's own tab-switching mechanism and the app's standard `.field`/`.grid`/`.section-head` form styling — no new UI primitive was introduced.
+- **Backend**: unchanged `server/routes/companySettings.js` (`buildModuleRouter`, same generic CRUD/upload pattern as every other module) — the existing `/api/company-settings` route is reused as-is, per the "no duplicate APIs" requirement; only its `attachmentFields` map gained `logo`/`stamp` entries.
+- **Frontend**: `MODULES.companySettings` (new entry in `modules.config.js`) centralizes the field-ID map — the Admin tab's form reads from it rather than hardcoding a second copy, and it doubles as a Data Browser entry for free.
+- **Consumers read, never re-enter.** `GET /api/chemicals/reports/dosh-register-data` (the only current consumer) fetches Company Settings once, same as before; a future report's data-aggregation route does the same — nothing about Company Profile is Chemical-Management-specific or imported into `chemical.module.js`'s own code anymore (its old inline "Edit Company Info" modal was deleted; the DOSH register page now just links to `/admin.html`).
+- **Validation**: Company Name required, Phone/Email format-checked client-side (`public/js/admin.js`) before save — the form uses `novalidate` and owns validation itself end to end, rather than relying on the browser's native constraint validation (which would otherwise block submission silently, before the app's own error messages ever ran).
 
 ## 6. Integration strategy
 

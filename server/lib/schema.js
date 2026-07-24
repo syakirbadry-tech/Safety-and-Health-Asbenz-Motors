@@ -269,16 +269,33 @@ module.exports = {
     tableId: "tbllJtwpaBgF04ra1",
     fields: {
       companyName: "fldQKivIll8afyhmz",
-      address: "fldpzCUQba9jVCqvc",
+      address: "fldpzCUQba9jVCqvc", // display name "Address Line 1" — see Company Profile
       city: "flde6aRzTMLyymGaJ",
       postcode: "fld1YyFYWz8dhcE7A",
       state: "fld2qlFAFBlctMzMc",
-      telephone: "fldJOk1DNlBXjhuJQ",
+      telephone: "fldJOk1DNlBXjhuJQ", // display name "Phone" — see Company Profile
       email: "fldiky0dCIBRyt9Tc",
       doshRegistrationNo: "fldT6YT1L1rtjtrga",
+      // Code of Sector / Class of Industry: DOSH-specific classification
+      // codes (Appendix 2/3 of the Chemical Register guideline), distinct
+      // from the general-purpose MSIC Code below — do not conflate them.
       codeOfSector: "fldqvcuuJTFolV0hX",
       classOfIndustry: "fldUHoCQxiw2nznMm",
       companyActivity: "fldP0PgrfeU8Tg99s",
+      // Company Profile module (v2.1) — single source of truth for company
+      // info, reused by every report (DOSH Register today; Noise/Machinery/
+      // CAPA/Committee reports as they add their own generated reports).
+      companyRegistrationNo: "fldSZNZQ7AAhh2Ma8",
+      msicCode: "fldW1Hg616xPmsErv",
+      addressLine2: "fldyAGfSibScKdPg4",
+      country: "flduy59e09yi9KTCm",
+      website: "fldVoLS91rxcZ14fu",
+      logo: "fldxiMprotecnHB97",
+      stamp: "fld0S3j5vilwOxygP",
+      defaultPreparedByName: "fldnmJ6OBIjNtFbwp",
+      defaultPreparedByPosition: "fldgxmx6bqQKcbpau",
+      defaultReviewedByName: "fldV7cUn1KCjcdOkQ",
+      defaultReviewedByPosition: "fldZrlIjWteoA29Te",
     },
   },
 
@@ -293,6 +310,9 @@ module.exports = {
       reviewedByName: "fldwtryC9vrCVbkt9",
       reviewedByTitle: "fldelgPkgOV0dFU7n",
       notes: "fldLHks5wWACe76rH",
+      // v2.1: which export path (Print/PDF vs Excel) produced this
+      // generation record — set programmatically, never user-entered.
+      exportFormat: "fldiwjEjyxuqoShs6",
     },
   },
 

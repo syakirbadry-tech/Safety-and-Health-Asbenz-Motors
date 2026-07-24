@@ -290,6 +290,52 @@ const MODULES = {
     complianceFieldId: null,
     attachments: [],
   },
+
+  // Company Profile (v2.1) — single source of truth for company info,
+  // edited via the Admin panel's "Company Profile" tab (public/js/admin.js),
+  // read automatically by every generated report (DOSH Register today).
+  // Conceptually a single-row table — the app always operates on the first
+  // record, creating one if none exists, same convention as before this
+  // module existed.
+  companySettings: {
+    key: "companySettings",
+    api: "/company-settings",
+    title: "Company Profile",
+    desc: "Single source of truth for company info, used by every generated report",
+    icon: "checklist",
+    dateField: null,
+    primary: "Company Name",
+    fields: {
+      "Company Name": "fldQKivIll8afyhmz",
+      "Company Registration Number": "fldSZNZQ7AAhh2Ma8",
+      "DOSH Registration Number": "fldT6YT1L1rtjtrga",
+      "MSIC Code": "fldW1Hg616xPmsErv",
+      "Code of Sector": "fldqvcuuJTFolV0hX",
+      "Class of Industry": "fldUHoCQxiw2nznMm",
+      "Company Activity": "fldP0PgrfeU8Tg99s",
+      "Address Line 1": "fldpzCUQba9jVCqvc",
+      "Address Line 2": "fldyAGfSibScKdPg4",
+      "Postcode": "fld1YyFYWz8dhcE7A",
+      "City": "flde6aRzTMLyymGaJ",
+      "State": "fld2qlFAFBlctMzMc",
+      "Country": "flduy59e09yi9KTCm",
+      "Phone": "fldJOk1DNlBXjhuJQ",
+      "Email": "fldiky0dCIBRyt9Tc",
+      "Website": "fldVoLS91rxcZ14fu",
+      "Default Prepared By": "fldnmJ6OBIjNtFbwp",
+      "Default Prepared By Position": "fldgxmx6bqQKcbpau",
+      "Default Reviewed By": "fldV7cUn1KCjcdOkQ",
+      "Default Reviewed By Position": "fldZrlIjWteoA29Te",
+    },
+    dateKeys: [],
+    textareaKeys: [],
+    listColumns: ["Company Name", "Country", "Email"],
+    complianceFieldId: null,
+    attachments: [
+      { key: "logo", fieldId: "fldxiMprotecnHB97", label: "Company Logo" },
+      { key: "stamp", fieldId: "fld0S3j5vilwOxygP", label: "Company Stamp" },
+    ],
+  },
 };
 
 // ---------------------------------------------------------------------

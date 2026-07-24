@@ -44,6 +44,7 @@
       <div class="tabs">
         <div class="tab active" data-tab="data">Data Browser</div>
         <div class="tab" data-tab="users">Users &amp; Roles</div>
+        <div class="tab" data-tab="company">Company Profile</div>
         <div class="tab" data-tab="activity">Login &amp; Activity History</div>
         <div class="tab" data-tab="settings">Settings</div>
       </div>
@@ -81,6 +82,78 @@
             <tbody id="usersBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <div id="tabCompany" class="hidden">
+        <p class="text-dim" style="font-size:12px;margin:-6px 0 16px;">
+          The single source of truth for company information — every generated report (DOSH Chemical
+          Register today; Noise, Machinery, CAPA and Committee reports as they add their own) reads
+          from here automatically. Nothing needs to be typed twice.
+        </p>
+        <form id="companyProfileForm" novalidate>
+          <div class="section-head" style="margin-top:0;"><h2>General Information</h2></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field"><label>Company Name *</label><input id="cpCompanyName" required /></div>
+            <div class="field"><label>Company Registration Number</label><input id="cpCompanyRegNo" /></div>
+            <div class="field"><label>DOSH Registration Number</label><input id="cpDoshRegNo" /></div>
+          </div>
+
+          <div class="section-head"><h2>Business Information</h2></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field"><label>MSIC Code</label><input id="cpMsicCode" /></div>
+            <div class="field"><label>Code of Sector (DOSH)</label><input id="cpCodeOfSector" /></div>
+            <div class="field"><label>Class of Industry (DOSH)</label><input id="cpClassOfIndustry" /></div>
+          </div>
+          <div class="field">
+            <label>Company Activity</label>
+            <div class="flex gap-8 flex-wrap" style="margin-top:6px;" id="cpActivityBox"></div>
+          </div>
+
+          <div class="section-head"><h2>Address</h2></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field"><label>Address Line 1</label><input id="cpAddressLine1" /></div>
+            <div class="field"><label>Address Line 2</label><input id="cpAddressLine2" /></div>
+            <div class="field"><label>Postcode</label><input id="cpPostcode" /></div>
+            <div class="field"><label>City</label><input id="cpCity" /></div>
+            <div class="field"><label>State</label><input id="cpState" /></div>
+            <div class="field"><label>Country</label><input id="cpCountry" placeholder="Malaysia" /></div>
+          </div>
+
+          <div class="section-head"><h2>Contact</h2></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field"><label>Phone</label><input id="cpPhone" placeholder="+60 3-1234 5678" /><div class="field-error" id="cpPhoneError"></div></div>
+            <div class="field"><label>Email</label><input id="cpEmail" type="email" /><div class="field-error" id="cpEmailError"></div></div>
+            <div class="field"><label>Website</label><input id="cpWebsite" placeholder="https://" /></div>
+          </div>
+
+          <div class="section-head"><h2>Branding</h2></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field">
+              <label>Company Logo</label>
+              <div class="meta" id="cpLogoPreview" style="margin-bottom:8px;font-size:12px;">No file uploaded.</div>
+              <label class="btn small">Upload<input type="file" accept="image/*" style="display:none" id="cpLogoInput" /></label>
+            </div>
+            <div class="field">
+              <label>Company Stamp (optional)</label>
+              <div class="meta" id="cpStampPreview" style="margin-bottom:8px;font-size:12px;">No file uploaded.</div>
+              <label class="btn small">Upload<input type="file" accept="image/*" style="display:none" id="cpStampInput" /></label>
+            </div>
+          </div>
+
+          <div class="section-head"><h2>Report Defaults</h2></div>
+          <p class="text-dim" style="font-size:12px;margin:-8px 0 12px;">Pre-fills Prepared By / Reviewed By on generated reports — always editable per generation, never forced.</p>
+          <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
+            <div class="field"><label>Default Prepared By</label><input id="cpPreparedName" /></div>
+            <div class="field"><label>Default Prepared By Position</label><input id="cpPreparedPosition" /></div>
+            <div class="field"><label>Default Reviewed By</label><input id="cpReviewedName" /></div>
+            <div class="field"><label>Default Reviewed By Position</label><input id="cpReviewedPosition" /></div>
+          </div>
+
+          <div class="flex gap-8" style="margin:24px 0;">
+            <button type="submit" class="btn primary" id="cpSaveBtn">Save</button>
+            <button type="button" class="btn ghost" id="cpResetBtn">Reset</button>
+          </div>
+        </form>
       </div>
 
       <div id="tabActivity" class="hidden">

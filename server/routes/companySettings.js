@@ -10,5 +10,8 @@ module.exports = buildModuleRouter({
   tableId: schema.companySettings.tableId,
   fields: schema.companySettings.fields,
   primaryFieldKey: "companyName",
-  attachmentFields: {},
+  attachmentFields: {
+    logo: schema.companySettings.fields.logo,
+    stamp: schema.companySettings.fields.stamp,
+  },
 });

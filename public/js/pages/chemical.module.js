@@ -955,20 +955,6 @@ async function saveWizard(file, suggestion) {
 // set once and reused) and Section C (who's generating this specific copy).
 // ---------------------------------------------------------------------
 
-const COMPANY_SETTINGS_FIELDS = {
-  companyName: "fldQKivIll8afyhmz",
-  address: "fldpzCUQba9jVCqvc",
-  city: "flde6aRzTMLyymGaJ",
-  postcode: "fld1YyFYWz8dhcE7A",
-  state: "fld2qlFAFBlctMzMc",
-  telephone: "fldJOk1DNlBXjhuJQ",
-  email: "fldiky0dCIBRyt9Tc",
-  doshRegistrationNo: "fldT6YT1L1rtjtrga",
-  codeOfSector: "fldqvcuuJTFolV0hX",
-  classOfIndustry: "fldUHoCQxiw2nznMm",
-  companyActivity: "fldP0PgrfeU8Tg99s",
-};
-
 const DOSH_GEN_FIELDS = {
   generationReference: "fldFDBFWXCqvMijmI",
   generatedDate: "fld3tXpmD2HMDL4TK",
@@ -977,7 +963,15 @@ const DOSH_GEN_FIELDS = {
   preparedByTitle: "fld4kskgsr0UwQgzw",
   reviewedByName: "fldwtryC9vrCVbkt9",
   reviewedByTitle: "fldelgPkgOV0dFU7n",
+  exportFormat: "fldiwjEjyxuqoShs6", // v2.1: "PDF" or "Excel" — see DOSH_REGISTER_FIELD_MAPPING.md
 };
+
+// Row unit for Section B is one Substance per Chemical (a Chemical with no
+// linked Substances still gets one row — see server/routes/chemicals.js).
+// 8 rows/page; the final page caps at 5 so Section C fits below it on the
+// same sheet, matching the guideline's own Appendix 5 pagination.
+const DOSH_ROWS_PER_PAGE = 8;
+const DOSH_ROWS_LAST_PAGE_WITH_C = 5;
 
 Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
@@ -1006,75 +1000,170 @@ Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   renderDoshReport(data, isAdmin);
 });
 
+// Splits Section B's rows into per-page chunks — see DOSH_ROWS_PER_PAGE /
+// DOSH_ROWS_LAST_PAGE_WITH_C above.
+function doshBuildPages(rows) {
+  const pages = [];
+  let i = 0;
+  while (i < rows.length) {
+    const remaining = rows.length - i;
+    const size = remaining <= DOSH_ROWS_LAST_PAGE_WITH_C ? remaining : DOSH_ROWS_PER_PAGE;
+    pages.push(rows.slice(i, i + size));
+    i += size;
+  }
+  if (!pages.length) pages.push([]);
+  return pages;
+}
+
+// One bordered box per character, matching the guideline's actual form
+// fill-in style for Section A (verified against the extracted PDF text,
+// which shows single-letter-spacing boxes throughout every field).
+function doshCharBoxes(value) {
+  const chars = String(value || "").split("");
+  if (!chars.length) return `<div class="dosh-charbox-row"></div>`;
+  return `<div class="dosh-charbox-row">${chars
+    .map((ch) => `<span class="dosh-charbox">${ch === " " ? "" : escapeHtml(ch)}</span>`)
+    .join("")}</div>`;
+}
+
 function renderDoshReport(data, isAdmin) {
   const c = data.company || {};
   const activities = c.companyActivity || [];
+  const activityMark = (name) => (activities.includes(name) ? "✓" : "");
+  const pages = doshBuildPages(data.rows);
+  const pageCount = pages.length + 1; // +1 for Section A's own page
 
-  document.getElementById("doshReport").innerHTML = `
-    <div class="dosh-report">
-      <div class="no-print flex gap-8" style="justify-content:flex-end;margin-bottom:14px;">
-        ${isAdmin ? `<button class="btn small" id="doshEditCompanyBtn">Edit Company Info</button>` : ""}
-        <button class="btn primary small" id="doshPrintBtn">Print / Save as PDF</button>
-      </div>
+  const sectionAHtml = `
+    <section class="dosh-page">
+      <div class="dosh-title">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</div>
+      <p style="text-align:center;font-size:10.5px;" class="text-dim">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
 
-      <h1 style="text-align:center;font-size:16px;">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</h1>
-      <p style="text-align:center;font-size:11.5px;" class="text-dim">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
-
-      <h2 style="font-size:13px;margin-top:24px;">SECTION A: COMPANY INFORMATION</h2>
-      <table class="dosh-table">
-        <tr><td><strong>Name</strong></td><td>${escapeHtml(c.companyName || "—")}</td><td><strong>DOSH Registration No.</strong></td><td>${escapeHtml(c.doshRegistrationNo || "—")}</td></tr>
-        <tr><td><strong>Address</strong></td><td>${escapeHtml(c.address || "—")}</td><td><strong>Code of Sector</strong></td><td>${escapeHtml(c.codeOfSector || "—")}</td></tr>
-        <tr><td><strong>City / Postcode</strong></td><td>${escapeHtml([c.city, c.postcode].filter(Boolean).join(" / ") || "—")}</td><td><strong>Class of Industry</strong></td><td>${escapeHtml(c.classOfIndustry || "—")}</td></tr>
-        <tr><td><strong>State</strong></td><td>${escapeHtml(c.state || "—")}</td><td><strong>Company Activity</strong></td><td>${escapeHtml(activities.join(", ") || "—")}</td></tr>
-        <tr><td><strong>Telephone</strong></td><td>${escapeHtml(c.telephone || "—")}</td><td></td><td></td></tr>
-        <tr><td><strong>Email</strong></td><td>${escapeHtml(c.email || "—")}</td><td></td><td></td></tr>
-      </table>
-
-      <h2 style="font-size:13px;margin-top:24px;">SECTION B: LIST OF CHEMICALS HAZARDOUS TO HEALTH</h2>
-      <div class="table-wrap">
-        <table class="dosh-table">
-          <thead><tr>
-            <th>Chemical Name</th><th>CAS No.</th><th>Location</th><th>Process</th><th>Hazard Classification</th>
-            <th>Quantity</th><th>Workers Exposed</th><th>Control Measures</th><th>PPE Used</th><th>Type of Use</th>
-            <th>CSDS (Y/N)</th><th>Label (Y/N)</th><th>Supplier</th>
-          </tr></thead>
-          <tbody>
-            ${data.rows.map((r) => `
-              <tr>
-                <td>${escapeHtml(r.chemicalName || "—")}</td>
-                <td>${escapeHtml(r.casNumber || "—")}</td>
-                <td>${escapeHtml(r.storageLocation || "—")}</td>
-                <td>${escapeHtml(r.process || "—")}</td>
-                <td>${escapeHtml(r.hazardClassification || "—")}</td>
-                <td>${escapeHtml(String(r.quantity || "—"))}</td>
-                <td>${escapeHtml(String(r.workersExposed === "" ? "—" : r.workersExposed))}</td>
-                <td>${escapeHtml(r.controlMeasures || "—")}</td>
-                <td>${escapeHtml(r.ppeActuallyUsed || "—")}</td>
-                <td>${escapeHtml(r.typeOfUse || "—")}</td>
-                <td style="text-align:center;">${r.csds}</td>
-                <td style="text-align:center;">${r.label}</td>
-                <td>${escapeHtml(r.supplier || "—")}</td>
-              </tr>`).join("") || `<tr><td colspan="13" class="text-dim">No chemicals registered yet.</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-
-      <h2 style="font-size:13px;margin-top:24px;">SECTION C: NAME OF PERSON WHO PREPARED OR REVIEWED</h2>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px;">
-        <div>
-          <div class="field"><label>Prepared By — Name</label><input type="text" id="doshPreparedName" /></div>
-          <div class="field"><label>Prepared By — Title</label><input type="text" id="doshPreparedTitle" /></div>
+      <div class="dosh-section-head">SECTION A : COMPANY INFORMATION</div>
+      <div class="dosh-form-box">
+        <div class="dosh-form-row"><label>Name</label>${doshCharBoxes(c.companyName)}</div>
+        <p class="dosh-form-note">(Refer to Appendix 2 for Code of Sector and Appendix 3 for Class of Industry)</p>
+        <div class="dosh-form-row"><label>Address</label>${doshCharBoxes(c.address)}</div>
+        <div class="dosh-form-row dosh-form-row-split">
+          <div class="dosh-form-row"><label>City</label>${doshCharBoxes(c.city)}</div>
+          <div class="dosh-form-row"><label>Postcode</label>${doshCharBoxes(c.postcode)}</div>
         </div>
-        <div>
-          <div class="field"><label>Reviewed By — Name</label><input type="text" id="doshReviewedName" /></div>
-          <div class="field"><label>Reviewed By — Title</label><input type="text" id="doshReviewedTitle" /></div>
+        <div class="dosh-form-row"><label>State</label>${doshCharBoxes(c.state)}</div>
+        <div class="dosh-form-row"><label>Telephone No.</label>${doshCharBoxes(c.telephone)}</div>
+        <div class="dosh-form-row"><label>Email</label>${doshCharBoxes(c.email)}</div>
+        <div class="dosh-form-row"><label>DOSH Registration No.</label>${doshCharBoxes(c.doshRegistrationNo)}</div>
+        <div class="dosh-form-row dosh-form-row-split">
+          <div class="dosh-form-row"><label>Code of Sector</label>${doshCharBoxes(c.codeOfSector)}</div>
+          <div class="dosh-form-row"><label>Class of Industry</label>${doshCharBoxes(c.classOfIndustry)}</div>
+        </div>
+        <div style="margin-top:8px;">
+          <div style="font-weight:600;margin-bottom:4px;">Company Activity (Please enter ( / ) in the appropriate box):</div>
+          <div class="dosh-activity-grid">
+            ${["Manufacturer", "Importer", "Distributor", "Formulator", "End-User"]
+              .map((name) => `<div>${name}</div><div class="dosh-activity-box">${activityMark(name)}</div>`)
+              .join("")}
+          </div>
         </div>
       </div>
-      <p class="text-dim" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
-    </div>
+      <div class="dosh-page-number">Page 1 of ${pageCount}</div>
+    </section>
   `;
 
-  document.getElementById("doshPrintBtn").addEventListener("click", async () => {
+  const sectionBHtml = pages
+    .map((rows, idx) => {
+      const showC = idx === pages.length - 1;
+      return `
+    <section class="dosh-page">
+      <div class="dosh-section-head">SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH</div>
+      <div class="dosh-b-meta">
+        <div>Location: <strong>${escapeHtml(rows[0]?.storageLocation || "—")}</strong></div>
+        <div>Process Operation: <strong>${escapeHtml(rows[0]?.process || "—")}</strong></div>
+        <div>No. of Hazardous Chemicals: <strong>${data.chemicalCount ?? data.rows.length}</strong></div>
+      </div>
+      <table class="dosh-table dosh-table-b">
+        <colgroup>
+          ${[10, 12, 6, 6, 14, 5, 4, 5, 5, 5, 5, 7, 6, 5, 5].map((pct) => `<col style="width:${pct}%">`).join("")}
+        </colgroup>
+        <thead>
+          <tr>
+            <th rowspan="2">Product Name</th>
+            <th rowspan="2">Name of Chemical</th>
+            <th rowspan="2">CAS No.</th>
+            <th rowspan="2">Physical Form</th>
+            <th rowspan="2">Active Ingredients</th>
+            <th rowspan="2">Quantity</th>
+            <th rowspan="2">Type#</th>
+            <th rowspan="2">Class</th>
+            <th rowspan="2">CSDS<br>(Y/N)</th>
+            <th rowspan="2">Label<br>(Y/N)</th>
+            <th rowspan="2">Workers<br>Exposed</th>
+            <th rowspan="2">Usage of Chemical</th>
+            <th colspan="2">Type of Control Measures</th>
+            <th rowspan="2">Supplier</th>
+          </tr>
+          <tr>
+            <th>Engineering Control</th>
+            <th>PPE</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtml(r.productName || "—")}</td>
+              <td>${escapeHtml(r.chemicalName || "—")}</td>
+              <td>${escapeHtml(r.casNumber || "—")}</td>
+              <td>${escapeHtml(r.physicalForm || "—")}</td>
+              <td>${escapeHtml(r.activeIngredients || "—")}</td>
+              <td>${escapeHtml(String(r.quantity || "—"))}</td>
+              <td style="text-align:center;">${escapeHtml(r.typeCode || "—")}</td>
+              <td style="text-align:center;">${escapeHtml(r.hazardClass || "NA")}</td>
+              <td style="text-align:center;">${r.csds}</td>
+              <td style="text-align:center;">${r.label}</td>
+              <td style="text-align:center;">${escapeHtml(String(r.workersExposed === "" ? "—" : r.workersExposed))}</td>
+              <td>${escapeHtml(r.typeOfUse || "—")}</td>
+              <td>${escapeHtml(r.controlMeasures || "—")}</td>
+              <td>${escapeHtml(r.ppeActuallyUsed || "—")}</td>
+              <td>${escapeHtml(r.supplier || "—")}</td>
+            </tr>`
+            )
+            .join("") || `<tr><td colspan="15" class="text-dim">No chemicals registered yet.</td></tr>`}
+        </tbody>
+      </table>
+      ${
+        showC
+          ? `
+      <div class="dosh-section-head" style="margin-top:14px;">SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <div class="field"><label>Prepared By — Name</label><input type="text" id="doshPreparedName" value="${escapeHtml(c.defaultPreparedByName || "")}" /></div>
+          <div class="field"><label>Prepared By — Title</label><input type="text" id="doshPreparedTitle" value="${escapeHtml(c.defaultPreparedByPosition || "")}" /></div>
+        </div>
+        <div>
+          <div class="field"><label>Reviewed By — Name</label><input type="text" id="doshReviewedName" value="${escapeHtml(c.defaultReviewedByName || "")}" /></div>
+          <div class="field"><label>Reviewed By — Title</label><input type="text" id="doshReviewedTitle" value="${escapeHtml(c.defaultReviewedByPosition || "")}" /></div>
+        </div>
+      </div>
+      <p class="text-dim no-print" style="font-size:11px;margin-top:6px;">Pre-filled from Company Profile (Admin → Company Profile) — still editable for this generation.</p>`
+          : ""
+      }
+      <div class="dosh-page-number">Page ${idx + 2} of ${pageCount}</div>
+    </section>`;
+    })
+    .join("");
+
+  document.getElementById("doshReport").innerHTML = `
+    <div class="no-print flex gap-8" style="justify-content:flex-end;margin-bottom:14px;">
+      ${isAdmin ? `<a class="btn small" href="/admin.html" target="_blank" rel="noopener">Edit Company Profile</a>` : ""}
+      <button class="btn small" id="doshExportExcelBtn">Export Excel</button>
+      <button class="btn primary small" id="doshPrintBtn">Print / Save as PDF</button>
+    </div>
+    ${sectionAHtml}
+    ${sectionBHtml}
+    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+  `;
+
+  async function logDoshGeneration(exportFormat) {
     try {
       const me = Auth.user();
       await api("/dosh-register-generations", {
@@ -1084,78 +1173,187 @@ function renderDoshReport(data, isAdmin) {
             [DOSH_GEN_FIELDS.generationReference]: `DOSH-REG-${Date.now()}`,
             [DOSH_GEN_FIELDS.generatedDate]: new Date().toISOString(),
             [DOSH_GEN_FIELDS.generatedBy]: me?.fullName || me?.email || "Unknown",
-            [DOSH_GEN_FIELDS.preparedByName]: document.getElementById("doshPreparedName").value,
-            [DOSH_GEN_FIELDS.preparedByTitle]: document.getElementById("doshPreparedTitle").value,
-            [DOSH_GEN_FIELDS.reviewedByName]: document.getElementById("doshReviewedName").value,
-            [DOSH_GEN_FIELDS.reviewedByTitle]: document.getElementById("doshReviewedTitle").value,
+            [DOSH_GEN_FIELDS.preparedByName]: document.getElementById("doshPreparedName")?.value || "",
+            [DOSH_GEN_FIELDS.preparedByTitle]: document.getElementById("doshPreparedTitle")?.value || "",
+            [DOSH_GEN_FIELDS.reviewedByName]: document.getElementById("doshReviewedName")?.value || "",
+            [DOSH_GEN_FIELDS.reviewedByTitle]: document.getElementById("doshReviewedTitle")?.value || "",
+            [DOSH_GEN_FIELDS.exportFormat]: exportFormat,
           },
         },
       });
     } catch (err) {
       console.error("Could not log DOSH register generation:", err);
     }
+  }
+
+  document.getElementById("doshPrintBtn").addEventListener("click", async () => {
+    await logDoshGeneration("PDF");
     window.print();
   });
 
-  if (isAdmin) {
-    const editBtn = document.getElementById("doshEditCompanyBtn");
-    if (editBtn) editBtn.addEventListener("click", () => openCompanySettingsForm(data.company));
-  }
+  document.getElementById("doshExportExcelBtn").addEventListener("click", async () => {
+    await logDoshGeneration("Excel");
+    doshExportExcel(data);
+  });
 }
 
-function openCompanySettingsForm(existing) {
-  modalTouchesModulePath = CHEMICAL_MODULE.basePath;
-  modalTitle.textContent = "Company Information (Section A)";
-  const labels = {
-    companyName: "Company Name", address: "Address", city: "City", postcode: "Postcode", state: "State",
-    telephone: "Telephone", email: "Email", doshRegistrationNo: "DOSH Registration No.",
-    codeOfSector: "Code of Sector", classOfIndustry: "Class of Industry",
-  };
-  const inputs = Object.entries(labels).map(([key, label]) => {
-    const val = existing ? existing[key] : "";
-    return key === "address"
-      ? `<div class="field"><label>${label}</label><textarea id="cs_${key}" rows="2">${escapeHtml(val || "")}</textarea></div>`
-      : `<div class="field"><label>${label}</label><input type="text" id="cs_${key}" value="${escapeHtml(val || "")}" /></div>`;
-  }).join("");
-  const activityOptions = ["Manufacturer", "Distributor", "Formulator", "Importer", "End-User"];
-  const existingActivities = existing?.companyActivity || [];
-
-  modalBody.innerHTML = `
-    <form id="companySettingsForm">
-      ${inputs}
-      <div class="field">
-        <label>Company Activity</label>
-        <div class="flex gap-8 flex-wrap" style="margin-top:6px;">
-          ${activityOptions.map((a) => `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:400;"><input type="checkbox" data-activity="${a}" ${existingActivities.includes(a) ? "checked" : ""} /> ${a}</label>`).join("")}
-        </div>
-      </div>
-      <div class="flex gap-8" style="margin:18px 0;">
-        <button type="submit" class="btn primary">Save</button>
-        <button type="button" class="btn ghost" id="csCancelBtn">Cancel</button>
-      </div>
-    </form>
-  `;
-  document.getElementById("csCancelBtn").addEventListener("click", closeModal);
-  document.getElementById("companySettingsForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const fields = {};
-    Object.keys(labels).forEach((key) => {
-      const val = document.getElementById(`cs_${key}`).value.trim();
-      if (val) fields[COMPANY_SETTINGS_FIELDS[key]] = val;
-    });
-    const activities = Array.from(document.querySelectorAll("[data-activity]:checked")).map((el) => el.dataset.activity);
-    if (activities.length) fields[COMPANY_SETTINGS_FIELDS.companyActivity] = activities;
-    try {
-      if (existing && existing.id) {
-        await api(`/company-settings/${existing.id}`, { method: "PATCH", body: { fields } });
-      } else {
-        await api("/company-settings", { method: "POST", body: { fields } });
-      }
-      toast("Company information saved.");
-      closeModal();
-    } catch (err) {
+// ---------------------------------------------------------------------
+// Excel export — a real formatted .xlsx (merged cells, borders, frozen/
+// repeating header row, landscape page setup), not the CSV the main
+// Chemical Register's own "Export Excel" button uses (moduleFramework.js's
+// exportFwRowsAsCsv, unchanged and unrelated to this). ExcelJS is lazy-
+// loaded from a CDN on first click rather than bundled — this app has no
+// build step, and this is the one report where a plain CSV can't reproduce
+// the guideline's actual merged/bordered Section A/B/C layout.
+// ---------------------------------------------------------------------
+async function doshExportExcel(data) {
+  if (!window.ExcelJS) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Could not load the Excel export library."));
+      document.head.appendChild(s);
+    }).catch((err) => {
       toast(err.message, true);
-    }
+      throw err;
+    });
+  }
+
+  const c = data.company || {};
+  const rows = data.rows || [];
+  const wb = new window.ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Chemical Register", {
+    pageSetup: {
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      paperSize: 9,
+      margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0, footer: 0 },
+    },
+    views: [{ showGridLines: false }],
   });
-  overlay.classList.add("open");
+
+  const thin = { style: "thin", color: { argb: "FF000000" } };
+  const border = { top: thin, left: thin, bottom: thin, right: thin };
+  const cols = [
+    "Product Name", "Name of Chemical", "CAS No.", "Physical Form", "Active Ingredients",
+    "Quantity", "Type#", "Class", "CSDS (Y/N)", "Label (Y/N)", "Workers Exposed",
+    "Usage of Chemical", "Engineering Control", "PPE", "Supplier",
+  ];
+  ws.columns = cols.map(() => ({ width: 16 }));
+  const CTRL_START = cols.indexOf("Engineering Control") + 1;
+
+  ws.mergeCells(1, 1, 1, cols.length);
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = "REGISTER OF CHEMICALS HAZARDOUS TO HEALTH";
+  titleCell.font = { bold: true, size: 14, name: "Arial" };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  titleCell.border = border;
+  ws.getRow(1).height = 22;
+
+  function sectionHead(row, text) {
+    ws.mergeCells(row, 1, row, cols.length);
+    const cell = ws.getCell(row, 1);
+    cell.value = text;
+    cell.font = { bold: true, size: 11, name: "Arial", color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF000000" } };
+  }
+  sectionHead(2, "SECTION A : COMPANY INFORMATION");
+
+  function addInfoRow(r, pairs) {
+    let col = 1;
+    pairs.forEach(([label, value]) => {
+      const span = Math.floor(cols.length / pairs.length);
+      const lc = ws.getCell(r, col);
+      lc.value = label;
+      lc.font = { bold: true, size: 9, name: "Arial" };
+      lc.border = border;
+      ws.mergeCells(r, col + 1, r, col + span - 1);
+      const vc = ws.getCell(r, col + 1);
+      vc.value = value;
+      vc.font = { size: 9, name: "Arial" };
+      vc.border = border;
+      col += span + 1;
+    });
+  }
+  addInfoRow(3, [["Name", c.companyName || ""], ["DOSH Reg. No.", c.doshRegistrationNo || ""]]);
+  addInfoRow(4, [["Address", c.address || ""], ["Code of Sector", c.codeOfSector || ""]]);
+  addInfoRow(5, [["City / Postcode", [c.city, c.postcode].filter(Boolean).join(" / ")], ["Class of Industry", c.classOfIndustry || ""]]);
+  addInfoRow(6, [["State", c.state || ""], ["Telephone", c.telephone || ""]]);
+  addInfoRow(7, [["Email", c.email || ""], ["Company Activity", (c.companyActivity || []).join(", ")]]);
+
+  sectionHead(8, "SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH");
+  const groupRow = 9;
+  const headerRow = 10;
+  ws.mergeCells(groupRow, CTRL_START, groupRow, CTRL_START + 1);
+  const groupCell = ws.getCell(groupRow, CTRL_START);
+  groupCell.value = "Type of Control Measures";
+  groupCell.font = { bold: true, size: 9, name: "Arial" };
+  groupCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E5E5" } };
+  groupCell.alignment = { horizontal: "center", vertical: "middle" };
+  groupCell.border = border;
+
+  const hRow = ws.getRow(headerRow);
+  cols.forEach((label, i) => {
+    const colNum = i + 1;
+    const inGroup = colNum === CTRL_START || colNum === CTRL_START + 1;
+    if (!inGroup) ws.mergeCells(groupRow, colNum, headerRow, colNum);
+    const top = ws.getCell(groupRow, colNum);
+    if (!inGroup) top.value = label;
+    top.font = { bold: true, size: 9, name: "Arial" };
+    top.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E5E5" } };
+    top.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    top.border = border;
+    const bottom = hRow.getCell(colNum);
+    bottom.value = inGroup ? label : undefined;
+    bottom.font = { bold: true, size: 9, name: "Arial" };
+    bottom.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E5E5" } };
+    bottom.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    bottom.border = border;
+  });
+  ws.views = [{ state: "frozen", ySplit: headerRow, showGridLines: false }];
+  ws.pageSetup.printTitlesRow = `${groupRow}:${headerRow}`;
+
+  rows.forEach((r, idx) => {
+    const row = ws.getRow(headerRow + 1 + idx);
+    const vals = [
+      r.productName, r.chemicalName, r.casNumber, r.physicalForm, r.activeIngredients,
+      r.quantity, r.typeCode, r.hazardClass, r.csds, r.label, r.workersExposed,
+      r.typeOfUse, r.controlMeasures, r.ppeActuallyUsed, r.supplier,
+    ];
+    vals.forEach((v, i) => {
+      const cell = row.getCell(i + 1);
+      cell.value = v ?? "";
+      cell.font = { size: 9, name: "Arial" };
+      cell.alignment = { wrapText: true, vertical: "top" };
+      cell.border = border;
+    });
+    row.height = 26;
+  });
+
+  let sigRow = headerRow + rows.length + 2;
+  sectionHead(sigRow, "SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED");
+  const half = Math.floor(cols.length / 2);
+  function sigLine(r, label) {
+    ws.mergeCells(r, 1, r, half);
+    ws.getCell(r, 1).value = label;
+    ws.getCell(r, 1).font = { size: 9, name: "Arial" };
+    ws.getCell(r, 1).border = border;
+    ws.mergeCells(r, half + 1, r, cols.length);
+    ws.getCell(r, half + 1).border = border;
+  }
+  sigLine(sigRow + 1, `Prepared By — Name: ${document.getElementById("doshPreparedName")?.value || ""}   Title: ${document.getElementById("doshPreparedTitle")?.value || ""}`);
+  sigLine(sigRow + 2, `Reviewed By — Name: ${document.getElementById("doshReviewedName")?.value || ""}   Title: ${document.getElementById("doshReviewedTitle")?.value || ""}`);
+  ws.pageSetup.printArea = `A1:${String.fromCharCode(64 + cols.length)}${sigRow + 2}`;
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `dosh-chemical-register-${new Date().toISOString().slice(0, 10)}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }

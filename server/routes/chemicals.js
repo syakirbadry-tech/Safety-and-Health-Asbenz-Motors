@@ -214,13 +214,39 @@ router.get("/reports/register-data", async (req, res) => {
   }
 });
 
+// "Type" codes per the official DOSH "Guidelines for the Preparation of a
+// Chemical Register" (Appendix 1, item f — "USAGE OF CHEMICAL: TYPE"),
+// verbatim from Docs/Regulations/chemical registered list - Copy.pdf. Maps
+// directly onto the existing Chemicals.typeOfUse select options (DATABASE.md
+// §3.4.2) — this is a display-layer lookup, not a stored field.
+const DOSH_TYPE_OF_USE_CODES = {
+  "Raw Material": "R",
+  Product: "P",
+  "By-product": "B",
+  "Intermediate-product": "I",
+  Stored: "S",
+  Waste: "W",
+  Cleaning: "C",
+  Degreasing: "D",
+  Other: "O",
+};
+
 // GET /reports/dosh-register-data — read-only aggregation for the generated
 // DOSH Chemical Register report (public/js/pages/chemical.module.js's
 // /chemical/dosh-register page). Section A = first Company Settings record;
-// Section B = every Chemical plus derived CSDS/Label Y-N flags, which are
-// computed here rather than stored, since both already exist elsewhere in
-// the system (an SDS Documents record with Status=Current; the most recent
-// Chemical Label Inspection's Compliant value) — avoids duplicating data.
+// Section B = one row per Substance linked to each Chemical (a Chemical with
+// no linked Substances still gets exactly one row, so it's never silently
+// dropped from a legally-required register), repeating every chemical-level
+// field. CSDS/Label/Type/Class are all derived here rather than stored —
+// CSDS and Label already existed; Type and Class were added per the real
+// guideline (not the 3 fabricated fields an earlier draft proposed — see
+// DOSH_REGISTER_FIELD_MAPPING.md): Type is Chemicals.typeOfUse's own code
+// letter (above), Class is Chemicals.hazardClassification verbatim, or "NA"
+// per the guideline's own instruction ("if classified using other
+// classification system, please enter NA") when hazardClassification isn't
+// set. There is no separate "Complies with CPL 1997" field — the guideline's
+// "Comply with Classification, Packaging and Labelling Regulation, 1997"
+// section IS just CSDS + Class + Label together, not a fourth column.
 //
 // Note: this MUST be a 2+ segment path, not e.g. "/dosh-register-data" —
 // buildModuleRouter already registered GET "/:id" above, which (being a
@@ -235,22 +261,36 @@ router.get("/reports/dosh-register-data", async (req, res) => {
     const SF = schema.sdsDocuments.fields;
     const LF = schema.chemicalLabelInspection.fields;
     const CSF = schema.companySettings.fields;
+    const SUBF = schema.substances.fields;
 
-    const [companyRecords, chemicals, sdsDocs, labelInspections] = await Promise.all([
+    const [companyRecords, chemicals, sdsDocs, labelInspections, substances] = await Promise.all([
       airtable.listRecords(schema.companySettings.tableId),
       airtable.listRecords(schema.chemicals.tableId),
       airtable.listRecords(schema.sdsDocuments.tableId),
       airtable.listRecords(schema.chemicalLabelInspection.tableId),
+      airtable.listRecords(schema.substances.tableId),
     ]);
 
     const company = companyRecords[0] || null;
 
     const currentSdsChemicalIds = new Set();
+    const sdsByChemical = {};
     sdsDocs.forEach((r) => {
+      (r.fields[SF.chemical] || []).forEach((id) => {
+        if (!sdsByChemical[id]) sdsByChemical[id] = [];
+        sdsByChemical[id].push(r);
+      });
       if (r.fields[SF.status] === "Current") {
         (r.fields[SF.chemical] || []).forEach((id) => currentSdsChemicalIds.add(id));
       }
     });
+    // Physical Form comes from the most recent SDS revision (any status),
+    // distinct from the CSDS flag above (which only counts Status=Current).
+    function latestSdsFor(chemicalId) {
+      const list = sdsByChemical[chemicalId] || [];
+      if (!list.length) return null;
+      return list.slice().sort((a, b) => new Date(b.fields[SF.revisionDate] || 0) - new Date(a.fields[SF.revisionDate] || 0))[0];
+    }
 
     const latestLabelByChemical = {};
     labelInspections
@@ -262,30 +302,71 @@ router.get("/reports/dosh-register-data", async (req, res) => {
         });
       });
 
-    const rows = chemicals.map((r) => ({
-      id: r.id,
-      chemicalName: r.fields[CF.chemicalName] || "",
-      casNumber: r.fields[CF.casNumber] || "",
-      storageLocation: r.fields[CF.storageLocation] || "",
-      department: r.fields[CF.department] || "",
-      process: r.fields[CF.process] || "",
-      hazardClassification: r.fields[CF.hazardClassification] || "",
-      quantity: r.fields[CF.quantity] || "",
-      workersExposed: r.fields[CF.workersExposed] ?? "",
-      controlMeasures: r.fields[CF.controlMeasures] || "",
-      ppeActuallyUsed: r.fields[CF.ppeActuallyUsed] || "",
-      typeOfUse: r.fields[CF.typeOfUse] || "",
-      supplier: r.fields[CF.supplier] || "",
-      csds: currentSdsChemicalIds.has(r.id) ? "Y" : "N",
-      label: latestLabelByChemical[r.id] === "Yes" ? "Y" : latestLabelByChemical[r.id] === "No" ? "N" : "—",
-    }));
+    const substancesByChemical = {};
+    substances.forEach((r) => {
+      (r.fields[SUBF.chemical] || []).forEach((id) => {
+        if (!substancesByChemical[id]) substancesByChemical[id] = [];
+        substancesByChemical[id].push(r);
+      });
+    });
+
+    const rows = [];
+    chemicals.forEach((r) => {
+      const latestSds = latestSdsFor(r.id);
+      const shared = {
+        chemicalId: r.id,
+        productName: r.fields[CF.chemicalName] || "", // display name "Product Name" — see schema.js comment
+        physicalForm: latestSds?.fields[SF.physicalForm] || "",
+        storageLocation: r.fields[CF.storageLocation] || "",
+        department: r.fields[CF.department] || "",
+        process: r.fields[CF.process] || "",
+        quantity: r.fields[CF.quantity] || "",
+        workersExposed: r.fields[CF.workersExposed] ?? "",
+        controlMeasures: r.fields[CF.controlMeasures] || "",
+        ppeActuallyUsed: r.fields[CF.ppeActuallyUsed] || "",
+        typeOfUse: r.fields[CF.typeOfUse] || "",
+        typeCode: DOSH_TYPE_OF_USE_CODES[r.fields[CF.typeOfUse]] || "—",
+        hazardClass: r.fields[CF.hazardClassification] || "NA",
+        supplier: r.fields[CF.supplier] || "",
+        csds: currentSdsChemicalIds.has(r.id) ? "Y" : "N",
+        label: latestLabelByChemical[r.id] === "Yes" ? "Y" : latestLabelByChemical[r.id] === "No" ? "N" : "—",
+      };
+
+      const subs = substancesByChemical[r.id] || [];
+      if (!subs.length) {
+        // No linked Substances yet — still emit one row so the chemical
+        // isn't silently missing from the register; fall back to the
+        // chemical's own CAS Number the way the pre-Substances report did.
+        rows.push({
+          ...shared,
+          chemicalName: "",
+          casNumber: r.fields[CF.casNumber] || "",
+          activeIngredients: "",
+        });
+      } else {
+        subs.forEach((s) => {
+          const concentration = s.fields[SUBF.concentration];
+          const name = s.fields[SUBF.chemicalName] || "";
+          rows.push({
+            ...shared,
+            chemicalName: name,
+            casNumber: s.fields[SUBF.casNumber] || "",
+            activeIngredients: name ? `${name}${concentration ? ` (${concentration})` : ""}` : "",
+          });
+        });
+      }
+    });
 
     res.json({
       company: company
         ? {
             id: company.id,
             companyName: company.fields[CSF.companyName] || "",
-            address: company.fields[CSF.address] || "",
+            // Section A's single "Address" line = Company Profile's Address
+            // Line 1 + Line 2 (the guideline's form has one address line;
+            // the Company Profile module — v2.1 — splits it into two for a
+            // more standard general-purpose address form).
+            address: [company.fields[CSF.address], company.fields[CSF.addressLine2]].filter(Boolean).join(", "),
             city: company.fields[CSF.city] || "",
             postcode: company.fields[CSF.postcode] || "",
             state: company.fields[CSF.state] || "",
@@ -295,9 +376,16 @@ router.get("/reports/dosh-register-data", async (req, res) => {
             codeOfSector: company.fields[CSF.codeOfSector] || "",
             classOfIndustry: company.fields[CSF.classOfIndustry] || "",
             companyActivity: company.fields[CSF.companyActivity] || [],
+            // Report Defaults (Company Profile, v2.1) — pre-fill Section C,
+            // still editable per generation, never forced.
+            defaultPreparedByName: company.fields[CSF.defaultPreparedByName] || "",
+            defaultPreparedByPosition: company.fields[CSF.defaultPreparedByPosition] || "",
+            defaultReviewedByName: company.fields[CSF.defaultReviewedByName] || "",
+            defaultReviewedByPosition: company.fields[CSF.defaultReviewedByPosition] || "",
           }
         : null,
       rows,
+      chemicalCount: chemicals.length,
     });
   } catch (err) {
     console.error(err);

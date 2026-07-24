@@ -18,8 +18,10 @@ document.querySelectorAll(".tab").forEach((tab) => {
     const target = tab.dataset.tab;
     document.getElementById("tabData").classList.toggle("hidden", target !== "data");
     document.getElementById("tabUsers").classList.toggle("hidden", target !== "users");
+    document.getElementById("tabCompany").classList.toggle("hidden", target !== "company");
     document.getElementById("tabActivity").classList.toggle("hidden", target !== "activity");
     document.getElementById("tabSettings").classList.toggle("hidden", target !== "settings");
+    if (target === "company") loadCompanyProfile();
     if (target === "activity") loadActivity();
     if (target === "settings") loadSettings();
   });
@@ -301,6 +303,200 @@ function openEditUser(u) {
 
   overlay.classList.add("open");
 }
+
+// ============================================================
+// Company Profile — the single source of truth for company info, reused by
+// every generated report (DOSH Chemical Register today; Noise/Machinery/
+// CAPA/Committee reports read the same table as they add their own). Backed
+// by the existing Company Settings table/route — conceptually a single-row
+// table, same convention as before this module existed: the app always
+// operates on the first record, creating one on first Save if none exists.
+// ============================================================
+const CP = MODULES.companySettings.fields;
+const CP_ACTIVITY_OPTIONS = ["Manufacturer", "Distributor", "Formulator", "Importer", "End-User"];
+let companyProfileRecord = null; // the live Airtable record, or null if none exists yet
+
+async function loadCompanyProfile() {
+  try {
+    const data = await api("/company-settings");
+    companyProfileRecord = (data.records || [])[0] || null;
+    renderCompanyProfileForm();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+function renderCompanyProfileForm() {
+  const f = companyProfileRecord?.fields || {};
+  const val = (key) => f[CP[key]] ?? "";
+
+  document.getElementById("cpCompanyName").value = val("Company Name");
+  document.getElementById("cpCompanyRegNo").value = val("Company Registration Number");
+  document.getElementById("cpDoshRegNo").value = val("DOSH Registration Number");
+  document.getElementById("cpMsicCode").value = val("MSIC Code");
+  document.getElementById("cpCodeOfSector").value = val("Code of Sector");
+  document.getElementById("cpClassOfIndustry").value = val("Class of Industry");
+  document.getElementById("cpAddressLine1").value = val("Address Line 1");
+  document.getElementById("cpAddressLine2").value = val("Address Line 2");
+  document.getElementById("cpPostcode").value = val("Postcode");
+  document.getElementById("cpCity").value = val("City");
+  document.getElementById("cpState").value = val("State");
+  document.getElementById("cpCountry").value = val("Country");
+  document.getElementById("cpPhone").value = val("Phone");
+  document.getElementById("cpEmail").value = val("Email");
+  document.getElementById("cpWebsite").value = val("Website");
+  document.getElementById("cpPreparedName").value = val("Default Prepared By");
+  document.getElementById("cpPreparedPosition").value = val("Default Prepared By Position");
+  document.getElementById("cpReviewedName").value = val("Default Reviewed By");
+  document.getElementById("cpReviewedPosition").value = val("Default Reviewed By Position");
+
+  const activities = f[CP["Company Activity"]] || [];
+  document.getElementById("cpActivityBox").innerHTML = CP_ACTIVITY_OPTIONS.map((a) =>
+    `<label style="display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:400;text-transform:none;">
+      <input type="checkbox" data-cp-activity="${a}" ${activities.includes(a) ? "checked" : ""} /> ${a}
+    </label>`
+  ).join("");
+
+  renderCpAttachmentPreview("logo", "cpLogoPreview");
+  renderCpAttachmentPreview("stamp", "cpStampPreview");
+  clearCpFieldErrors();
+}
+
+function renderCpAttachmentPreview(key, elId) {
+  const mod = MODULES.companySettings;
+  const attachment = mod.attachments.find((a) => a.key === key);
+  const files = companyProfileRecord?.fields[attachment.fieldId] || [];
+  const el = document.getElementById(elId);
+  el.innerHTML = files.length
+    ? files.map((file) => `<a class="file-chip" href="${file.url}" target="_blank" rel="noopener">📎 ${escapeHtml(file.filename)}</a>`).join("")
+    : `<span class="text-dim">No file uploaded.</span>`;
+}
+
+function clearCpFieldErrors() {
+  document.getElementById("cpPhoneError").textContent = "";
+  document.getElementById("cpEmailError").textContent = "";
+  document.getElementById("cpPhone").classList.remove("invalid");
+  document.getElementById("cpEmail").classList.remove("invalid");
+}
+
+// Loose but real validation — accepts spaces/dashes/parens/an optional
+// leading +, digits only otherwise, 7-15 digits (E.164-ish, not
+// Malaysia-specific, since a report vendor/branch could be based anywhere).
+const CP_PHONE_RE = /^\+?[\d\s()-]{7,20}$/;
+const CP_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateCompanyProfileForm() {
+  clearCpFieldErrors();
+  let ok = true;
+
+  const name = document.getElementById("cpCompanyName").value.trim();
+  if (!name) {
+    toast("Company Name is required.", true);
+    document.getElementById("cpCompanyName").focus();
+    ok = false;
+  }
+
+  const phone = document.getElementById("cpPhone").value.trim();
+  if (phone && !CP_PHONE_RE.test(phone)) {
+    document.getElementById("cpPhoneError").textContent = "Doesn't look like a valid phone number.";
+    document.getElementById("cpPhone").classList.add("invalid");
+    ok = false;
+  }
+
+  const email = document.getElementById("cpEmail").value.trim();
+  if (email && !CP_EMAIL_RE.test(email)) {
+    document.getElementById("cpEmailError").textContent = "Doesn't look like a valid email address.";
+    document.getElementById("cpEmail").classList.add("invalid");
+    ok = false;
+  }
+
+  return ok;
+}
+
+document.getElementById("companyProfileForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!validateCompanyProfileForm()) return;
+
+  const fields = {
+    [CP["Company Name"]]: document.getElementById("cpCompanyName").value.trim(),
+    [CP["Company Registration Number"]]: document.getElementById("cpCompanyRegNo").value.trim(),
+    [CP["DOSH Registration Number"]]: document.getElementById("cpDoshRegNo").value.trim(),
+    [CP["MSIC Code"]]: document.getElementById("cpMsicCode").value.trim(),
+    [CP["Code of Sector"]]: document.getElementById("cpCodeOfSector").value.trim(),
+    [CP["Class of Industry"]]: document.getElementById("cpClassOfIndustry").value.trim(),
+    [CP["Address Line 1"]]: document.getElementById("cpAddressLine1").value.trim(),
+    [CP["Address Line 2"]]: document.getElementById("cpAddressLine2").value.trim(),
+    [CP["Postcode"]]: document.getElementById("cpPostcode").value.trim(),
+    [CP["City"]]: document.getElementById("cpCity").value.trim(),
+    [CP["State"]]: document.getElementById("cpState").value.trim(),
+    [CP["Country"]]: document.getElementById("cpCountry").value.trim(),
+    [CP["Phone"]]: document.getElementById("cpPhone").value.trim(),
+    [CP["Email"]]: document.getElementById("cpEmail").value.trim(),
+    [CP["Website"]]: document.getElementById("cpWebsite").value.trim(),
+    [CP["Default Prepared By"]]: document.getElementById("cpPreparedName").value.trim(),
+    [CP["Default Prepared By Position"]]: document.getElementById("cpPreparedPosition").value.trim(),
+    [CP["Default Reviewed By"]]: document.getElementById("cpReviewedName").value.trim(),
+    [CP["Default Reviewed By Position"]]: document.getElementById("cpReviewedPosition").value.trim(),
+  };
+  const activities = Array.from(document.querySelectorAll("[data-cp-activity]:checked")).map((el) => el.dataset.cpActivity);
+  fields[CP["Company Activity"]] = activities;
+
+  const saveBtn = document.getElementById("cpSaveBtn");
+  saveBtn.disabled = true;
+  try {
+    if (companyProfileRecord) {
+      const res = await api(`/company-settings/${companyProfileRecord.id}`, { method: "PATCH", body: { fields } });
+      companyProfileRecord = res.record;
+    } else {
+      const res = await api("/company-settings", { method: "POST", body: { fields } });
+      companyProfileRecord = res.record;
+    }
+    toast("Company Profile saved.");
+    renderCompanyProfileForm();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+document.getElementById("cpResetBtn").addEventListener("click", () => {
+  renderCompanyProfileForm(); // discard unsaved edits, reload last-saved values
+  toast("Reset to last saved values.");
+});
+
+async function uploadCpAttachment(key, file) {
+  if (!companyProfileRecord) {
+    // No record yet — create a blank one first so there's somewhere to
+    // attach the file (mirrors the rest of the app's "save creates the row"
+    // convention; the wizard-style presave-attachment flow isn't warranted
+    // here since Company Profile has no multi-step create wizard).
+    try {
+      const res = await api("/company-settings", { method: "POST", body: { fields: {} } });
+      companyProfileRecord = res.record;
+    } catch (err) {
+      return toast(err.message, true);
+    }
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    toast("Uploading…");
+    const res = await api(`/company-settings/${companyProfileRecord.id}/upload/${key}`, { method: "POST", body: fd, isForm: true });
+    companyProfileRecord = res.record;
+    toast("Uploaded.");
+    renderCompanyProfileForm();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+document.getElementById("cpLogoInput").addEventListener("change", (e) => {
+  if (e.target.files[0]) uploadCpAttachment("logo", e.target.files[0]);
+});
+document.getElementById("cpStampInput").addEventListener("change", (e) => {
+  if (e.target.files[0]) uploadCpAttachment("stamp", e.target.files[0]);
+});
 
 // ---------- Activity ----------
 let activityCache = [];

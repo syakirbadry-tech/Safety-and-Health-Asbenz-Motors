@@ -177,6 +177,8 @@ main.content .page{max-width:1180px;margin:0 auto;padding:36px clamp(16px,4vw,32
 
 /* ---------- Forms ---------- */
 .field{margin-bottom:14px;}
+.field-error{color:var(--danger);font-size:11.5px;margin-top:5px;min-height:1px;}
+.field input.invalid{border-color:var(--danger);}
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
 .field input,.field select,.field textarea{
   width:100%;padding:10px 12px;border-radius:3px;border:1px solid var(--border);
@@ -362,22 +364,54 @@ tr.row-click:hover td{background:var(--panel-2);}
 @keyframes spin{to{transform:rotate(360deg);}}
 
 /* ---------- DOSH Chemical Register (generated report) ---------- */
-.dosh-report{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:28px;color:var(--text);}
+/* Deliberately monochrome regardless of the app's light/dark theme (matches
+   the official guideline's own black-and-white form) — background/color are
+   set explicitly here rather than via --panel/--border, since the app's
+   global `td{background:var(--panel)}` (components: table cells) would
+   otherwise win the cascade and render these cells dark-on-dark. */
 .dosh-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px;}
-.dosh-table th,.dosh-table td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
-.dosh-table th{background:var(--panel-2);font-weight:700;white-space:nowrap;}
+.dosh-table th,.dosh-table td{border:1px solid #999;padding:7px 9px;text-align:left;vertical-align:top;background:#fff;color:#000;}
+.dosh-table th{background:#e5e5e5;font-weight:700;}
+.dosh-table-b{table-layout:fixed;}
+.dosh-table-b th,.dosh-table-b td{overflow-wrap:break-word;word-break:break-word;white-space:normal;}
+
+/* v2.1: Section A and each Section B page-chunk render as their own
+   .dosh-page "sheet" (see renderDoshReport/doshBuildPages in
+   chemical.module.js) — monochrome, matching the official DOSH guideline's
+   own black-and-white form styling, on-screen as well as printed. */
+.dosh-page{background:#fff;color:#000;padding:24px;margin-bottom:24px;border:1px solid var(--border);border-radius:var(--radius);}
+.dosh-title{text-align:center;font-size:16px;font-weight:700;border:1px solid #000;padding:8px 4px;}
+.dosh-section-head{font-weight:700;background:#000;color:#fff;padding:4px 8px;margin-top:14px;font-size:12.5px;}
+.dosh-form-box{border:1px solid #000;border-top:none;padding:10px 12px;font-size:12px;}
+.dosh-form-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:8px;margin-bottom:6px;}
+.dosh-form-row label{font-weight:600;}
+.dosh-form-row-split{grid-template-columns:1fr 1fr;}
+.dosh-form-note{font-size:10px;color:#555;margin:0 0 6px 158px;}
+.dosh-charbox-row{display:flex;flex-wrap:wrap;gap:2px;}
+.dosh-charbox{width:18px;height:18px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-weight:600;text-transform:uppercase;font-size:11px;flex-shrink:0;}
+.dosh-activity-grid{display:grid;grid-template-columns:repeat(5, auto 26px);gap:4px 16px;align-items:center;font-size:12px;}
+.dosh-activity-box{border:1px solid #000;text-align:center;height:20px;line-height:20px;}
+.dosh-page-number{text-align:right;font-size:9px;color:#555;margin-top:6px;}
+.dosh-b-meta{display:flex;gap:20px;flex-wrap:wrap;border:1px solid #000;border-top:none;padding:6px 10px;font-size:11.5px;}
+.dosh-table-b{font-size:9.5px;}
+.dosh-table-b th{font-size:9px;}
 
 /* Printing the DOSH register (or any future print view): show only the
    report itself — no sidebar, breadcrumb, or action buttons — and let the
    browser's native "Print to PDF" produce the actual file, rather than
    adding a server-side PDF-generation dependency for something the browser
-   already does natively. */
+   already does natively. Each .dosh-page prints as its own sheet, landscape
+   (the guideline's Section B table is wide — 15 columns), with Section B's
+   header repeating on every printed page and no row split across a page
+   break. */
 @media print{
   .sidebar,.no-print{display:none !important;}
   .app-shell{display:block;}
   .content{margin:0;padding:0;}
-  .dosh-report{border:none;padding:0;background:#fff;color:#000;}
-  .dosh-table th{background:#eee;}
-  .dosh-table th,.dosh-table td{border-color:#999;color:#000;}
   body{background:#fff;}
+  @page{size:A4 landscape;margin:0;}
+  .dosh-page{border:none;border-radius:0;padding:0.4in;margin:0;break-after:page;box-sizing:border-box;}
+  .dosh-page:last-child{break-after:auto;}
+  .dosh-table-b thead{display:table-header-group;}
+  .dosh-table-b tbody tr{break-inside:avoid;}
 }

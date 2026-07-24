@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DOSH Chemical Register — Print Template</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #ddd; margin: 0; }
+  .sheet {
+    background: #fff;
+    width: 11.69in;
+    min-height: 8.27in;
+    margin: 0.3in auto;
+    padding: 0.4in;
+    box-shadow: 0 0 8px rgba(0,0,0,0.25);
+  }
+  .sheet.section-a { display: flex; flex-direction: column; }
+  .sheet.section-b { break-after: page; }
+  .sheet:last-of-type { break-after: auto; }
+
+  .title { text-align: center; border: 1px solid #000; padding: 8px 4px; font-weight: 700; font-size: 15px; letter-spacing: .02em; }
+  .subtitle { text-align: center; font-size: 10px; color: #555; margin: 4px 0 0; }
+
+  .section-head { font-weight: 700; background: #000; color: #fff; padding: 4px 8px; margin-top: 12px; font-size: 12.5px; }
+
+  /* ---- Section A: form box with character-boxed fields ---- */
+  .form-box { border: 1px solid #000; border-top: none; padding: 10px 12px; font-size: 12px; flex: 1; }
+  .form-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .form-row label { font-weight: 600; }
+  .form-row-split { grid-template-columns: 1fr 1fr; }
+  .form-note { font-size: 10px; color: #555; margin: 0 0 6px 158px; }
+  .charbox-row { display: flex; flex-wrap: wrap; gap: 2px; }
+  .charbox { width: 18px; height: 18px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; font-weight: 600; text-transform: uppercase; font-size: 11px; flex-shrink: 0; }
+  .activity-grid { display: grid; grid-template-columns: repeat(5, auto 26px); gap: 4px 16px; align-items: center; font-size: 12px; margin-top: 4px; }
+  .activity-box { border: 1px solid #000; text-align: center; height: 20px; line-height: 20px; }
+  .page-number { text-align: right; font-size: 9px; color: #555; margin-top: 6px; }
+
+  /* ---- Section B: chemical table ---- */
+  .b-meta { display: flex; gap: 20px; flex-wrap: wrap; border: 1px solid #000; border-top: none; padding: 6px 10px; font-size: 11.5px; }
+  table.reg-table { width: 100%; border-collapse: collapse; font-size: 9px; table-layout: fixed; }
+  table.reg-table th, table.reg-table td { border: 1px solid #000; padding: 4px 3px; text-align: left; vertical-align: top; word-wrap: break-word; }
+  table.reg-table th { background: #e5e5e5; font-weight: 700; text-align: center; }
+  table.reg-table thead { display: table-header-group; } /* repeats on every printed page */
+  table.reg-table tbody tr { break-inside: avoid; }
+
+  /* ---- Section C: signatures ---- */
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #000; border-top: none; margin-top: 0; }
+  .signatures > div { padding: 8px 10px; }
+  .signatures > div:first-child { border-right: 1px solid #000; }
+  .sig-line { margin-top: 16px; border-top: 1px solid #000; width: 180px; padding-top: 2px; font-size: 10px; }
+
+  @media print {
+    body { background: #fff; }
+    .sheet { box-shadow: none; margin: 0; width: auto; min-height: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ PAGE 1 — SECTION A: COMPANY INFORMATION ============ -->
+<div class="sheet section-a">
+  <div class="title">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</div>
+  <p class="subtitle">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
+
+  <div class="section-head">SECTION A : COMPANY INFORMATION</div>
+  <div class="form-box">
+    <div class="form-row"><label>Name</label><div class="charbox-row">{{#each companyName}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    <p class="form-note">(Refer to Appendix 4 for Code of Sector and Appendix 5 for Class of Industry)</p>
+
+    <div class="form-row"><label>Address</label><div class="charbox-row">{{#each address}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+
+    <div class="form-row-split">
+      <div class="form-row"><label>City</label><div class="charbox-row">{{#each city}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+      <div class="form-row"><label>Postcode</label><div class="charbox-row">{{#each postcode}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    </div>
+
+    <div class="form-row"><label>State</label><div class="charbox-row">{{#each state}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    <div class="form-row"><label>Telephone No.</label><div class="charbox-row">{{#each telephone}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    <div class="form-row"><label>Email</label><div class="charbox-row">{{#each email}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    <div class="form-row"><label>DOSH Registration No.</label><div class="charbox-row">{{#each doshRegistrationNo}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+
+    <div class="form-row-split">
+      <div class="form-row"><label>Code of Sector</label><div class="charbox-row">{{#each codeOfSector}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+      <div class="form-row"><label>Class of Industry</label><div class="charbox-row">{{#each classOfIndustry}}<span class="charbox">{{this}}</span>{{/each}}</div></div>
+    </div>
+
+    <div style="margin-top:8px;">
+      <div style="font-weight:600;">Company Activity (Please enter ( / ) in the appropriate box):</div>
+      <div class="activity-grid">
+        <div>Manufacturer</div><div class="activity-box">{{activityMarks.manufacturer}}</div>
+        <div>Importer</div><div class="activity-box">{{activityMarks.importer}}</div>
+        <div>Distributor</div><div class="activity-box">{{activityMarks.distributor}}</div>
+        <div>Formulator</div><div class="activity-box">{{activityMarks.formulator}}</div>
+        <div>End-User</div><div class="activity-box">{{activityMarks.endUser}}</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-number">Page 1 of {{pageCount}}</div>
+</div>
+
+<!-- ============ PAGE 2+ — SECTION B: LIST OF CHEMICALS (repeats per page-chunk) ============ -->
+<!-- Your templating layer should chunk {{chemicals}} into pages (e.g. 8 rows each,
+     5 on the final chunk so Section C fits below it) and repeat this whole
+     .sheet.section-b block once per chunk, incrementing {{pageNumber}}. -->
+<div class="sheet section-b">
+  <div class="section-head">SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH</div>
+  <div class="b-meta">
+    <div>Location: <strong>{{location}}</strong></div>
+    <div>Process Operation: <strong>{{processOperation}}</strong></div>
+    <div>No. of Hazardous Chemicals: <strong>{{chemicalCount}}</strong></div>
+    <div>Workers — Male: <strong>{{workersMale}}</strong> / Female: <strong>{{workersFemale}}</strong></div>
+  </div>
+
+  <table class="reg-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Product Name</th>
+        <th rowspan="2">Name of Chemical</th>
+        <th rowspan="2">CAS No.</th>
+        <th rowspan="2">Physical Form</th>
+        <th rowspan="2">Active Ingredients<br><span style="font-weight:400;font-size:8px;">(Concentration)</span></th>
+        <th rowspan="2">Quantity</th>
+        <th rowspan="2">Type#</th>
+        <th rowspan="2">Class</th>
+        <th rowspan="2">CSDS<br>(Y/N)</th>
+        <th rowspan="2">Label<br>(Y/N)</th>
+        <th rowspan="2">Complies CPL 1977<br>(Y/N)</th>
+        <th rowspan="2">Workers<br>Exposed</th>
+        <th rowspan="2">Usage of Chemical</th>
+        <th colspan="2">Type of Control Measures</th>
+        <th rowspan="2">Supplier Name, Address &amp; Contact</th>
+      </tr>
+      <tr>
+        <th>Engineering Control</th>
+        <th>PPE</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- One product can have MANY substances (your Substances sub-table).
+           The guideline's row unit is one row per SUBSTANCE, not per product.
+           No merged/rowspan cells: every row repeats the full product-level
+           data (Product Name, Physical Form, Quantity, Type#, Class, CSDS,
+           Label, Complies CPL, Workers Exposed, Usage, Engineering Control,
+           PPE, Supplier). "Name of Chemical" is always "Not Applicable" here —
+           these products don't have one single named chemical, only a mix of
+           substances — so the substance's name + concentration go in
+           "Active Ingredients" instead; only CAS No. / Active Ingredients
+           change per row.
+           {{#each chemicals}}
+             {{#each this.substances}}
+               <tr>
+                 <td>{{../productName}}</td>
+                 <td>Not Applicable</td>
+                 <td style="text-align:center;">{{casNumber}}</td>
+                 <td>{{../physicalForm}}</td>
+                 <td>{{chemicalName}} ({{concentration}})</td>
+                 <td style="text-align:center;">{{../quantity}}</td>
+                 <td style="text-align:center;">{{../typeCode}}</td>
+                 <td style="text-align:center;">{{../hazardClass}}</td>
+                 <td style="text-align:center;">{{../csds}}</td>
+                 <td style="text-align:center;">{{../label}}</td>
+                 <td style="text-align:center;">{{../compliesCpl}}</td>
+                 <td style="text-align:center;">{{../workersExposed}}</td>
+                 <td>{{../usage}}</td>
+                 <td>{{../engineeringControl}}</td>
+                 <td>{{../ppe}}</td>
+                 <td>{{../supplier}}</td>
+               </tr>
+             {{/each}}
+           {{/each}} -->
+
+      <!-- Sample rows using your real "Hinterachsgetriebeöl MB 235.62" data (6 substances, 1 product, no merged cells) -->
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">68937-96-2</td>
+        <td>Liquid</td>
+        <td>Polysulfides, di-tert-Bu (≤ 5 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">72623-86-0</td>
+        <td>Liquid</td>
+        <td>Lubricating oils (petroleum), C15-30, hydrotreated neutral oil-based (≤ 5 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">—</td>
+        <td>Liquid</td>
+        <td>Reaction products of bis(4-methylpentan-2-yl) dithiophosphoric acid with phosphorus oxide, propylene oxide and amines, C12-14-alkyl (branched) (≤ 3 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">1213789-63-9</td>
+        <td>Liquid</td>
+        <td>Alkylamine (&lt; 1 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">1174522-45-2</td>
+        <td>Liquid</td>
+        <td>Hydrocarbons, C13-C16, n-alkanes, isoalkanes, cyclics, aromatics &lt; 0.03% (≤ 3 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Hinterachsgetriebeöl MB 235.62</td>
+        <td>Not Applicable</td>
+        <td style="text-align:center;">68411-46-1</td>
+        <td>Liquid</td>
+        <td>Benzenamine, N-phenyl-, reaction products with 2,4,4-trimethylpentene (≤ 1 %)</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">Y</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td style="text-align:center;">—</td>
+        <td>Spare Part — lubricant top-up</td>
+        <td>—</td>
+        <td>Nitrile Glove</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section C renders only on the FINAL Section B page-chunk -->
+  <!-- {{#if isLastPage}} -->
+  <div class="section-head" style="margin-top:14px;">SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED</div>
+  <div class="signatures">
+    <div>
+      <div style="font-weight:700;margin-bottom:4px;">PREPARED BY:</div>
+      <div>Name: {{prepared.name}}</div>
+      <div>Title: {{prepared.title}}</div>
+      <div>Date: {{prepared.date}}</div>
+      <div class="sig-line">(Signature)</div>
+    </div>
+    <div>
+      <div style="font-weight:700;margin-bottom:4px;">REVIEWED BY:</div>
+      <div>Name: {{reviewed.name}}</div>
+      <div>Title: {{reviewed.title}}</div>
+      <div>Date: {{reviewed.date}}</div>
+      <div class="sig-line">(Signature)</div>
+    </div>
+  </div>
+  <!-- {{/if}} -->
+
+  <div class="page-number">Page {{pageNumber}} of {{pageCount}}</div>
+</div>
+
+</body>
+</html>
