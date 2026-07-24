@@ -153,6 +153,7 @@ router.get(
       { key: "training", tableId: schema.chemicalSafetyTraining.tableId, linkFieldId: schema.chemicalSafetyTraining.fields.chemical },
       { key: "chra", tableId: schema.chra.tableId, linkFieldId: schema.chra.fields.chemicalLink },
       { key: "substances", tableId: schema.substances.tableId, linkFieldId: schema.substances.fields.chemical },
+      { key: "processUsage", tableId: schema.chemicalProcessUsage.tableId, linkFieldId: schema.chemicalProcessUsage.fields.chemical },
     ],
     postProcess: (result, master) => {
       result.complianceSummary = buildComplianceSummary(master, result.subTables);

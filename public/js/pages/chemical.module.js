@@ -45,9 +45,45 @@ const CHEMICAL_MODULE = defineBusinessModule({
   generalInfoDerived: (profile) => CHEMICAL_MODULE_renderGeneralInfoDerived(profile),
   headerSubtitleFields: ["Storage Location", "CAS Number"],
 
-  dashboardSubTabOrder: ["sdsDocuments", "substances", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
+  dashboardSubTabOrder: ["sdsDocuments", "substances", "processUsage", "exposureMonitoring", "storageInspection", "labelInspection", "wasteManagement", "training"],
 
   subTables: {
+    // v2.2 — a chemical can be used across multiple processes/locations,
+    // each with its own quantity/workers-exposed/controls/PPE/type-of-use,
+    // instead of the single flat set of those fields on the Chemicals master
+    // record. The wizard still writes the flat fields (unchanged, backward
+    // compatible) and additionally creates the first record here, marked
+    // primary. See DOSH_REGISTER_FIELD_MAPPING.md and ARCHITECTURE.md §5.2.2.
+    processUsage: {
+      title: "Process Usage",
+      api: "/chemical-process-usage",
+      primary: "process",
+      parentFieldKey: "chemical",
+      fields: {
+        process: "fldzMffNmxpq27Wsh",
+        chemical: "fldruQfRUGHZ0gGDP",
+        location: "fldmiVRwaRRHt6HbY",
+        quantity: "fld8SdSRPPsNrljhu",
+        workersExposed: "fldAOy5kdLeUXAFCr",
+        controlMeasures: "fldotGUx3hav5A0x7",
+        ppe: "fldSJ5WrHtxyUVs8g",
+        typeOfUse: "fldUu94FPCDAtvxM6",
+        remarks: "fldROFN119yTbqt6J",
+        isPrimaryUsage: "fldwpgPFSFphavBvf",
+      },
+      formMeta: {
+        labels: {
+          process: "Process / Operation", location: "Location", quantity: "Quantity Used", workersExposed: "Workers Exposed",
+          controlMeasures: "Engineering Controls", ppe: "PPE", typeOfUse: "Type of Use", remarks: "Remarks",
+        },
+        dateKeys: [],
+        selectOptions: { typeOfUse: ["Raw Material", "Product", "By-product", "Intermediate-product", "Stored", "Waste", "Cleaning", "Degreasing", "Other"] },
+        textareaKeys: ["controlMeasures", "ppe", "remarks"],
+        numberKeys: ["workersExposed"],
+      },
+      listColumns: ["location", "quantity", "workersExposed"],
+      countLabel: "Process Usage Records",
+    },
     substances: {
       title: "Substances",
       api: "/substances",
@@ -313,6 +349,7 @@ const CHEMICAL_MODULE = defineBusinessModule({
   profileSubTabs: [
     { subKey: "sdsDocuments", tabKey: "sds", label: "SDS", emptyNoun: "SDS revisions" },
     { subKey: "substances", tabKey: "substances", label: "Substances", emptyNoun: "substances" },
+    { subKey: "processUsage", tabKey: "processUsage", label: "Process Usage", emptyNoun: "process usage records" },
     { subKey: "storageInspection", tabKey: "storage", label: "Storage", emptyNoun: "storage inspections" },
     { subKey: "labelInspection", tabKey: "label", label: "Label Inspection", emptyNoun: "label inspections" },
     { subKey: "wasteManagement", tabKey: "waste", label: "Waste Management", emptyNoun: "waste disposal records" },
@@ -875,6 +912,28 @@ async function saveWizard(file, suggestion) {
     }
 
     const chemical = await CHEMICAL_MODULE._services.master.create(chemFields);
+
+    // Also create the first Chemical Process Usage record from the same
+    // "Additional Details" inputs, marked primary — a chemical can later be
+    // linked to further processes from its Profile's Process Usage tab. The
+    // flat Chemicals fields above are still written too (unchanged, backward
+    // compatible); this is additive. Best-effort like Substances below: a
+    // failure here shouldn't undo the chemical/SDS that already saved.
+    try {
+      const PF = CHEMICAL_MODULE.subTables.processUsage.fields;
+      const usageFields = { [PF.chemical]: [chemical.id], [PF.isPrimaryUsage]: true };
+      const putU = (fieldId, val) => { if (val !== "" && val != null) usageFields[fieldId] = val; };
+      putU(PF.process, wv("wz_process"));
+      putU(PF.location, wv("wz_storageLocation"));
+      putU(PF.quantity, wv("wz_quantity"));
+      if (workers !== "") usageFields[PF.workersExposed] = Number(workers);
+      putU(PF.controlMeasures, wv("wz_controlMeasures"));
+      putU(PF.ppe, wv("wz_ppeActuallyUsed"));
+      putU(PF.typeOfUse, wv("wz_typeOfUse"));
+      await CHEMICAL_MODULE._services.sub.processUsage.create(usageFields);
+    } catch (err) {
+      console.error("Could not save the initial process usage record:", err);
+    }
 
     const SF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
     const ghsPictograms = Array.from(document.querySelectorAll("[data-ghs]:checked")).map((el) => el.dataset.ghs);
