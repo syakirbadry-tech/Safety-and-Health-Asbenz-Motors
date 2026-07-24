@@ -1008,13 +1008,21 @@ function renderDoshReport(data, isAdmin) {
   const activityMark = (name) => (activities.includes(name) ? "✓" : "");
   const pages = ReportEngine.paginate(data.rows, { perPage: DOSH_ROWS_PER_PAGE, lastPageReserve: DOSH_ROWS_LAST_PAGE_WITH_C });
   const pageCount = pages.length + 1; // +1 for Section A's own page
-  const documentNumber = `DOSH-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const documentNumber = ReportEngine.documentNumber(c, "DOSH-REG");
+  // Landscape is structural (Section B's 15 columns), not a preference, and
+  // colours never apply — the official guideline form stays black-and-white
+  // regardless of Company Profile's Primary/Secondary Colour, matching its
+  // existing logo/stamp exclusion.
+  const pageAttrs = ReportEngine.pageAttrs(c, "landscape", { colours: false });
+  const pageAttrsStr = `class="report-page ${pageAttrs.class}" style="${pageAttrs.style}"`;
 
   const sectionAHtml = `
-    <section class="report-page report-page--landscape">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       <div class="report-title">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</div>
       <p style="text-align:center;font-size:10.5px;" class="text-dim">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
-      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: DOSH_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ${ReportEngine.renderDocInfo(c, { documentNumber, reportVersion: DOSH_REPORT_VERSION, generatedAt: new Date().toISOString() })}
 
       <div class="report-section-head">SECTION A : COMPANY INFORMATION</div>
       <div class="report-form-box">
@@ -1042,7 +1050,7 @@ function renderDoshReport(data, isAdmin) {
           </div>
         </div>
       </div>
-      ${ReportEngine.pageNumber(1, pageCount)}
+      ${ReportEngine.renderFooter(c, { pageNum: 1, pageCount })}
     </section>
   `;
 
@@ -1050,7 +1058,9 @@ function renderDoshReport(data, isAdmin) {
     .map((rows, idx) => {
       const showC = idx === pages.length - 1;
       return `
-    <section class="report-page report-page--landscape">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       <div class="report-section-head">SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH</div>
       <div class="report-meta-strip">
         <div>Location: <strong>${escapeHtml(rows[0]?.storageLocation || "—")}</strong></div>
@@ -1118,22 +1128,26 @@ function renderDoshReport(data, isAdmin) {
           preparedByTitle: c.defaultPreparedByPosition,
           reviewedByName: c.defaultReviewedByName,
           reviewedByTitle: c.defaultReviewedByPosition,
+          approvedByName: c.approvedByName,
+          approvedByTitle: c.approvedByPosition,
         },
-        "dosh"
+        "dosh",
+        c
       )}
       <p class="text-dim no-print" style="font-size:11px;margin-top:6px;">Pre-filled from Company Profile (Admin → Company Profile) — still editable for this generation.</p>`
           : ""
       }
-      ${ReportEngine.pageNumber(idx + 2, pageCount)}
+      ${ReportEngine.renderFooter(c, { pageNum: idx + 2, pageCount })}
     </section>`;
     })
     .join("");
 
+  const me = Auth.user();
   document.getElementById("doshReport").innerHTML = `
     <div id="doshToolbar"></div>
     ${sectionAHtml}
     ${sectionBHtml}
-    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+    ${ReportEngine.renderGeneratedNote(c, { generatedBy: me?.fullName || me?.email })}
   `;
 
   async function logDoshGeneration(exportFormat) {
@@ -1314,21 +1328,28 @@ Router.register("/chemical/register-report", async (params, path, isCurrent) => 
 
 function renderChemicalRegisterReport(data, isAdmin) {
   const rows = data.rows || [];
+  const c = data.company || {};
   const pages = ReportEngine.paginate(rows, {
     perPage: CHEMICAL_REGISTER_ROWS_PER_PAGE,
     lastPageReserve: CHEMICAL_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF,
   });
-  const documentNumber = `CHEM-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const documentNumber = ReportEngine.documentNumber(c, "CHEM-REG");
+  // No structural orientation requirement (only 8 columns) — respects the
+  // admin's Default Orientation.
+  const pageAttrs = ReportEngine.pageAttrs(c);
+  const pageAttrsStr = `class="report-page ${pageAttrs.class}" style="${pageAttrs.style}"`;
 
   const pagesHtml = pages
     .map((pageRows, idx) => {
       const showSignoff = idx === pages.length - 1;
       return `
-    <section class="report-page">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       ${idx === 0 ? `
       <div class="report-title">CHEMICAL REGISTER</div>
-      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
-      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: CHEMICAL_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ${ReportEngine.renderBranding(c)}
+      ${ReportEngine.renderDocInfo(c, { documentNumber, reportVersion: CHEMICAL_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
       ` : ""}
       <table class="report-table report-table--compact">
         <thead>
@@ -1367,24 +1388,28 @@ function renderChemicalRegisterReport(data, isAdmin) {
       <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
       ${ReportEngine.renderSignatureBlock(
         {
-          preparedByName: data.company?.defaultPreparedByName,
-          preparedByTitle: data.company?.defaultPreparedByPosition,
-          reviewedByName: data.company?.defaultReviewedByName,
-          reviewedByTitle: data.company?.defaultReviewedByPosition,
+          preparedByName: c.defaultPreparedByName,
+          preparedByTitle: c.defaultPreparedByPosition,
+          reviewedByName: c.defaultReviewedByName,
+          reviewedByTitle: c.defaultReviewedByPosition,
+          approvedByName: c.approvedByName,
+          approvedByTitle: c.approvedByPosition,
         },
-        "chemReg"
+        "chemReg",
+        c
       )}`
           : ""
       }
-      ${ReportEngine.pageNumber(idx + 1, pages.length)}
+      ${ReportEngine.renderFooter(c, { pageNum: idx + 1, pageCount: pages.length })}
     </section>`;
     })
     .join("");
 
+  const me = Auth.user();
   document.getElementById("chemRegisterReport").innerHTML = `
     <div id="chemRegisterToolbar"></div>
     ${pagesHtml}
-    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+    ${ReportEngine.renderGeneratedNote(c, { generatedBy: me?.fullName || me?.email })}
   `;
 
   ReportEngine.mountToolbar(document.getElementById("chemRegisterToolbar"), {

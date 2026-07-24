@@ -94,17 +94,24 @@ Router.register("/osh-committee/register-report", async (params, path, isCurrent
 function renderOshCommitteeRegisterReport(data, isAdmin) {
   const meetingRows = data.meetingRows || [];
   const memberRows = data.memberRows || [];
+  const c = data.company || {};
   const meetingPages = ReportEngine.paginate(meetingRows, { perPage: OSH_COMMITTEE_MEETING_ROWS_PER_PAGE });
-  const documentNumber = `OSHC-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const documentNumber = ReportEngine.documentNumber(c, "OSHC-REG");
   const pageCount = meetingPages.length + 1; // +1 for the Members Roster page
+  // No structural orientation requirement — respects the admin's Default
+  // Orientation.
+  const pageAttrs = ReportEngine.pageAttrs(c);
+  const pageAttrsStr = `class="report-page ${pageAttrs.class}" style="${pageAttrs.style}"`;
 
   const meetingPagesHtml = meetingPages
     .map((rows, idx) => `
-    <section class="report-page">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       ${idx === 0 ? `
       <div class="report-title">OSH COMMITTEE REGISTER</div>
-      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
-      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: OSH_COMMITTEE_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ${ReportEngine.renderBranding(c)}
+      ${ReportEngine.renderDocInfo(c, { documentNumber, reportVersion: OSH_COMMITTEE_REPORT_VERSION, generatedAt: new Date().toISOString() })}
       ` : ""}
       <div class="report-section-head">MEETING MINUTES LOG</div>
       <table class="report-table report-table--compact">
@@ -140,12 +147,14 @@ function renderOshCommitteeRegisterReport(data, isAdmin) {
             .join("") || `<tr><td colspan="9" class="text-dim">No meetings recorded yet.</td></tr>`}
         </tbody>
       </table>
-      ${ReportEngine.pageNumber(idx + 1, pageCount)}
+      ${ReportEngine.renderFooter(c, { pageNum: idx + 1, pageCount })}
     </section>`)
     .join("");
 
   const membersPageHtml = `
-    <section class="report-page">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       <div class="report-section-head">COMMITTEE MEMBERS ROSTER</div>
       <table class="report-table report-table--compact">
         <thead>
@@ -179,21 +188,25 @@ function renderOshCommitteeRegisterReport(data, isAdmin) {
       <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
       ${ReportEngine.renderSignatureBlock(
         {
-          preparedByName: data.company?.defaultPreparedByName,
-          preparedByTitle: data.company?.defaultPreparedByPosition,
-          reviewedByName: data.company?.defaultReviewedByName,
-          reviewedByTitle: data.company?.defaultReviewedByPosition,
+          preparedByName: c.defaultPreparedByName,
+          preparedByTitle: c.defaultPreparedByPosition,
+          reviewedByName: c.defaultReviewedByName,
+          reviewedByTitle: c.defaultReviewedByPosition,
+          approvedByName: c.approvedByName,
+          approvedByTitle: c.approvedByPosition,
         },
-        "oshcReg"
+        "oshcReg",
+        c
       )}
-      ${ReportEngine.pageNumber(pageCount, pageCount)}
+      ${ReportEngine.renderFooter(c, { pageNum: pageCount, pageCount })}
     </section>`;
 
+  const me = Auth.user();
   document.getElementById("oshCommitteeRegisterReport").innerHTML = `
     <div id="oshCommitteeRegisterToolbar"></div>
     ${meetingPagesHtml}
     ${membersPageHtml}
-    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+    ${ReportEngine.renderGeneratedNote(c, { generatedBy: me?.fullName || me?.email })}
   `;
 
   ReportEngine.mountToolbar(document.getElementById("oshCommitteeRegisterToolbar"), {

@@ -138,21 +138,28 @@ Router.register("/capa/register-report", async (params, path, isCurrent) => {
 
 function renderCapaRegisterReport(data, isAdmin) {
   const rows = data.rows || [];
+  const c = data.company || {};
   const pages = ReportEngine.paginate(rows, {
     perPage: CAPA_REGISTER_ROWS_PER_PAGE,
     lastPageReserve: CAPA_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF,
   });
-  const documentNumber = `CAPA-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const documentNumber = ReportEngine.documentNumber(c, "CAPA-REG");
+  // Landscape is structural (10 columns), not a preference — always wins
+  // over the admin's Default Orientation.
+  const pageAttrs = ReportEngine.pageAttrs(c, "landscape");
+  const pageAttrsStr = `class="report-page ${pageAttrs.class}" style="${pageAttrs.style}"`;
 
   const pagesHtml = pages
     .map((pageRows, idx) => {
       const showSignoff = idx === pages.length - 1;
       return `
-    <section class="report-page report-page--landscape">
+    <section ${pageAttrsStr}>
+      ${ReportEngine.renderWatermark(c)}
+      ${ReportEngine.renderConfidentialBanner(c)}
       ${idx === 0 ? `
       <div class="report-title">CORRECTIVE ACTIONS (CAPA) REGISTER</div>
-      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
-      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: CAPA_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ${ReportEngine.renderBranding(c)}
+      ${ReportEngine.renderDocInfo(c, { documentNumber, reportVersion: CAPA_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
       ` : ""}
       <table class="report-table report-table--compact">
         <thead>
@@ -195,24 +202,28 @@ function renderCapaRegisterReport(data, isAdmin) {
       <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
       ${ReportEngine.renderSignatureBlock(
         {
-          preparedByName: data.company?.defaultPreparedByName,
-          preparedByTitle: data.company?.defaultPreparedByPosition,
-          reviewedByName: data.company?.defaultReviewedByName,
-          reviewedByTitle: data.company?.defaultReviewedByPosition,
+          preparedByName: c.defaultPreparedByName,
+          preparedByTitle: c.defaultPreparedByPosition,
+          reviewedByName: c.defaultReviewedByName,
+          reviewedByTitle: c.defaultReviewedByPosition,
+          approvedByName: c.approvedByName,
+          approvedByTitle: c.approvedByPosition,
         },
-        "capaReg"
+        "capaReg",
+        c
       )}`
           : ""
       }
-      ${ReportEngine.pageNumber(idx + 1, pages.length)}
+      ${ReportEngine.renderFooter(c, { pageNum: idx + 1, pageCount: pages.length })}
     </section>`;
     })
     .join("");
 
+  const me = Auth.user();
   document.getElementById("capaRegisterReport").innerHTML = `
     <div id="capaRegisterToolbar"></div>
     ${pagesHtml}
-    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+    ${ReportEngine.renderGeneratedNote(c, { generatedBy: me?.fullName || me?.email })}
   `;
 
   ReportEngine.mountToolbar(document.getElementById("capaRegisterToolbar"), {
