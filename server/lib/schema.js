@@ -296,6 +296,45 @@ module.exports = {
       defaultPreparedByPosition: "fldgxmx6bqQKcbpau",
       defaultReviewedByName: "fldV7cUn1KCjcdOkQ",
       defaultReviewedByPosition: "fldZrlIjWteoA29Te",
+
+      // Central administration expansion — Company Profile becomes the
+      // single source of truth for every setting a generated report reads
+      // (see ARCHITECTURE.md §5.6/§5.7). All additive, one table, no new
+      // record shape.
+      industry: "fldzcHzGg0PkySGKl", // general-purpose, distinct from codeOfSector/classOfIndustry/msicCode above
+      taxNumber: "fldODFQovSuvy2pLh",
+      description: "fldvKY9ua9URuTcgV",
+      watermark: "fldb6kpi7jiCpgnCl",
+      primaryColour: "fldkgEuDEEMDFdBl1",
+      secondaryColour: "fldX7rChYiaQHF3cD",
+      documentPrefix: "fld9yRYty1lGmzBIr",
+      defaultVersion: "fldNwrNNmVYFlq4f6",
+      documentFooter: "fldO9wu0CdpFlKkiy",
+      defaultPaperSize: "fldISfenI0SDPZ3SQ", // select: A4/Letter/Legal
+      defaultOrientation: "fldTbuYzyg3KkVcqR", // select: Portrait/Landscape — only honored by reports without a structural column-count requirement
+      defaultLanguage: "fldars8zKVaWnCBLP", // select: English/Bahasa Malaysia — stored only, not translated
+      companyConfidential: "fldJLGAUAC1yNUm5Y", // select: Off/On
+      approvedByName: "fldQ6To11Ajd62gP6",
+      approvedByPosition: "fld7L1D3r4blwQhHy",
+      preparedBySignature: "fldBSVvq20J31LIHk",
+      reviewedBySignature: "fld9XC3IBy11zgxCA",
+      approvedBySignature: "fld3NpPIf6bJFBaVl",
+      // Export Settings — all select fields (Show/Hide, or Repeat/Don't
+      // Repeat), never checkboxes: Airtable's API omits an unchecked
+      // checkbox from a record's fields entirely, indistinguishable from
+      // "never set" — a select's explicit choice is always returned, so
+      // "unset" can cleanly default to today's shipped behavior (show
+      // everything) while still letting an admin reliably turn one off.
+      showLogo: "fldWLDEvSPBPVdHZA",
+      showStamp: "fldqwvnPZOEHATeKL",
+      showFooter: "fld3AT5CidG9Spppb",
+      showPageNumbers: "fldzen5h8VZLwKCMH",
+      showGeneratedDate: "fldSGIlNmHduRqYvD",
+      showGeneratedTime: "fld0m4Pp4YV0zdpmq",
+      showGeneratedBy: "fldkdt12EcvIRjPyP",
+      repeatTableHeaders: "fldH0pQZaxg90HSyx",
+      showDocumentVersion: "fldUwXMxGUwuIEtgM",
+      showDocumentNumber: "fldBRDSJ5mrXpBjmF",
     },
   },
 

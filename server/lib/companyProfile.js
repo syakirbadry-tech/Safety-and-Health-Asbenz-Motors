@@ -38,6 +38,49 @@ async function getCompanyProfile() {
     defaultPreparedByPosition: company.fields[CSF.defaultPreparedByPosition] || "",
     defaultReviewedByName: company.fields[CSF.defaultReviewedByName] || "",
     defaultReviewedByPosition: company.fields[CSF.defaultReviewedByPosition] || "",
+
+    // Central administration expansion (ARCHITECTURE.md §5.7) ---------------
+    industry: company.fields[CSF.industry] || "",
+    taxNumber: company.fields[CSF.taxNumber] || "",
+    description: company.fields[CSF.description] || "",
+    watermark: company.fields[CSF.watermark] || [],
+    primaryColour: company.fields[CSF.primaryColour] || "",
+    secondaryColour: company.fields[CSF.secondaryColour] || "",
+    documentPrefix: company.fields[CSF.documentPrefix] || "",
+    defaultVersion: company.fields[CSF.defaultVersion] || "",
+    documentFooter: company.fields[CSF.documentFooter] || "",
+    defaultPaperSize: company.fields[CSF.defaultPaperSize] || "A4",
+    // Only honored by reports without a structural column-count
+    // requirement — DOSH/Machinery/CAPA stay landscape regardless (see
+    // ReportEngine.pageOrientationClass).
+    defaultOrientation: company.fields[CSF.defaultOrientation] || "Portrait",
+    // Stored only — no translation is implemented; reports stay English-only.
+    defaultLanguage: company.fields[CSF.defaultLanguage] || "English",
+    companyConfidential: company.fields[CSF.companyConfidential] === "On",
+    approvedByName: company.fields[CSF.approvedByName] || "",
+    approvedByPosition: company.fields[CSF.approvedByPosition] || "",
+    signatures: {
+      prepared: company.fields[CSF.preparedBySignature] || [],
+      reviewed: company.fields[CSF.reviewedBySignature] || [],
+      approved: company.fields[CSF.approvedBySignature] || [],
+    },
+    // Every value below defaults to "on" when the field has never been
+    // touched (Airtable's API can't distinguish an unchecked checkbox from
+    // an untouched one, so these are select fields — see schema.js) —
+    // nothing already-shipped changes in appearance until an admin
+    // actively picks "Hide" for something.
+    exportSettings: {
+      showLogo: company.fields[CSF.showLogo] !== "Hide",
+      showStamp: company.fields[CSF.showStamp] !== "Hide",
+      showFooter: company.fields[CSF.showFooter] !== "Hide",
+      showPageNumbers: company.fields[CSF.showPageNumbers] !== "Hide",
+      showGeneratedDate: company.fields[CSF.showGeneratedDate] !== "Hide",
+      showGeneratedTime: company.fields[CSF.showGeneratedTime] !== "Hide",
+      showGeneratedBy: company.fields[CSF.showGeneratedBy] !== "Hide",
+      repeatTableHeaders: company.fields[CSF.repeatTableHeaders] !== "Don't Repeat",
+      showDocumentVersion: company.fields[CSF.showDocumentVersion] !== "Hide",
+      showDocumentNumber: company.fields[CSF.showDocumentNumber] !== "Hide",
+    },
   };
 }
 

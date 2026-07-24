@@ -14,6 +14,10 @@ const router = buildModuleRouter({
   attachmentFields: {
     logo: schema.companySettings.fields.logo,
     stamp: schema.companySettings.fields.stamp,
+    watermark: schema.companySettings.fields.watermark,
+    preparedBySignature: schema.companySettings.fields.preparedBySignature,
+    reviewedBySignature: schema.companySettings.fields.reviewedBySignature,
+    approvedBySignature: schema.companySettings.fields.approvedBySignature,
   },
 });
 
