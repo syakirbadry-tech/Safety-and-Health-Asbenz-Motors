@@ -189,6 +189,34 @@ module.exports = {
       levRequired: "fld0wB7ebUCXrQX9S",
       biologicalMonitoringRequired: "fldN3Or0Gzc5867z5",
       healthSurveillanceRequired: "fldofE2agyQ8ZdT6l",
+      // Inverse link auto-created when Chemical Process Usage's own
+      // `chemical` field was added — not written to directly by any route,
+      // only present so a chemical's linked usage records are visible from
+      // its own Airtable record.
+      processUsage: "fldQoQIwRFDKY3Ljz",
+    },
+  },
+
+  // Per-process/location usage of a chemical (v2.2) — additive alongside
+  // Chemicals' own flat process/quantity/workersExposed/controlMeasures/
+  // ppeActuallyUsed/typeOfUse fields, which remain the source of truth for a
+  // chemical with zero linked usage records here (see DOSH_REGISTER_FIELD_MAPPING.md
+  // and ARCHITECTURE.md §5.2.2). A chemical used across multiple processes
+  // gets one Chemical Process Usage record per process, each with its own
+  // quantity/workers-exposed/controls/PPE/type-of-use.
+  chemicalProcessUsage: {
+    tableId: "tbl3kESP5Ta7FP7B6",
+    fields: {
+      process: "fldzMffNmxpq27Wsh", // primary field, display name "Process / Operation"
+      chemical: "fldruQfRUGHZ0gGDP",
+      location: "fldmiVRwaRRHt6HbY",
+      quantity: "fld8SdSRPPsNrljhu", // display name "Quantity Used"
+      workersExposed: "fldAOy5kdLeUXAFCr",
+      controlMeasures: "fldotGUx3hav5A0x7", // display name "Engineering Controls"
+      ppe: "fldSJ5WrHtxyUVs8g",
+      typeOfUse: "fldUu94FPCDAtvxM6",
+      remarks: "fldROFN119yTbqt6J",
+      isPrimaryUsage: "fldwpgPFSFphavBvf",
     },
   },
 
