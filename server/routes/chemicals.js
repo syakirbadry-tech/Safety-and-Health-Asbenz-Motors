@@ -39,6 +39,75 @@ router.post("/extract-sds-preview", upload.single("file"), async (req, res) => {
   }
 });
 
+// GET /lookup/find-existing — duplicate-detection check for the Add Chemical
+// wizard, called right after SDS extraction populates the review step and
+// before the user can save. Read-only, no Airtable writes. Priority order
+// (highest confidence first): exact CAS Number match; otherwise Product Name
+// matched together with Manufacturer (from the chemical's most recent SDS
+// revision, any status) or Supplier. Must be a 2+ segment path — see the
+// note on /reports/dosh-register-data above about GET "/:id" shadowing any
+// single-segment GET route registered after it.
+router.get("/lookup/find-existing", async (req, res) => {
+  try {
+    const CF = schema.chemicals.fields;
+    const SF = schema.sdsDocuments.fields;
+    const norm = (v) => String(v || "").trim().toLowerCase();
+    const casNumber = norm(req.query.casNumber);
+    const productName = norm(req.query.productName);
+    const manufacturer = norm(req.query.manufacturer);
+    const supplier = norm(req.query.supplier);
+
+    if (!casNumber && !productName) {
+      return res.json({ match: null });
+    }
+
+    const [chemicals, sdsDocs] = await Promise.all([
+      airtable.listRecords(schema.chemicals.tableId),
+      airtable.listRecords(schema.sdsDocuments.tableId),
+    ]);
+
+    const manufacturerByChemical = {};
+    sdsDocs
+      .slice()
+      .sort((a, b) => new Date(b.fields[SF.revisionDate] || 0) - new Date(a.fields[SF.revisionDate] || 0))
+      .forEach((r) => {
+        (r.fields[SF.chemical] || []).forEach((id) => {
+          if (!(id in manufacturerByChemical)) manufacturerByChemical[id] = r.fields[SF.manufacturer] || "";
+        });
+      });
+
+    let found = null;
+    if (casNumber) {
+      found = chemicals.find((r) => norm(r.fields[CF.casNumber]) === casNumber);
+    }
+    if (!found && productName) {
+      found = chemicals.find((r) => {
+        if (norm(r.fields[CF.chemicalName]) !== productName) return false;
+        const mfr = norm(manufacturerByChemical[r.id]);
+        const sup = norm(r.fields[CF.supplier]);
+        return (manufacturer && mfr === manufacturer) || (supplier && sup === supplier);
+      });
+    }
+
+    if (!found) return res.json({ match: null });
+
+    res.json({
+      match: {
+        id: found.id,
+        productName: found.fields[CF.chemicalName] || "",
+        casNumber: found.fields[CF.casNumber] || "",
+        supplier: found.fields[CF.supplier] || "",
+        manufacturer: manufacturerByChemical[found.id] || "",
+        storageLocation: found.fields[CF.storageLocation] || "",
+        hazardClassification: found.fields[CF.hazardClassification] || "",
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not check for an existing chemical." });
+  }
+});
+
 // Time-based SDS status, distinct from SDS Documents' own `status` field
 // (Current/Superseded — revision history). Derived from the Expiry Date
 // formula field (Revision Date + 5 years) at read time, same "compute, don't

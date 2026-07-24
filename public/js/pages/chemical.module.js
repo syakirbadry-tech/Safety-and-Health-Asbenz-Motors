@@ -776,9 +776,11 @@ function renderWizardStep2(file, s) {
   modalTitle.textContent = "Add Chemical — Review";
   const guessedCategory = guessHazardCategory(s.hazardClassification);
   const pictograms = new Set(Array.isArray(s.ghsPictograms) ? s.ghsPictograms : []);
+  wizardUpdateExistingId = null; // reset — see checkWizardDuplicate/renderWizardDuplicateBanner below
 
   modalBody.innerHTML = `
     <p class="text-dim" style="font-size:13px;margin-bottom:14px;">Step 2 of 2 — Fields marked <span class="badge ok" style="font-size:9px;padding:2px 5px;">AI</span> were read from the SDS; check them before saving. Anything the AI couldn't read is left blank below. Then complete the workplace information.</p>
+    <div id="wizardDupeCheck"></div>
     <div class="section-head" style="margin-top:0;"><h2 style="font-size:14px;">From the SDS</h2></div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
       ${wizField("wz_productName", "Product Name", { value: s.productName || s.chemicalName, aiPopulated: !!(s.productName || s.chemicalName) })}
@@ -861,6 +863,64 @@ function renderWizardStep2(file, s) {
   document.getElementById("wizardCancelBtn2").addEventListener("click", closeModal);
   document.getElementById("wizardBackBtn").addEventListener("click", () => renderWizardStep1());
   document.getElementById("wizardSaveBtn").addEventListener("click", () => saveWizard(file, s));
+
+  checkWizardDuplicate(s);
+}
+
+// ---- Duplicate-detection ("Existing Chemical Found") ----
+// Set by the "Update Existing" action below; read by saveWizard to decide
+// whether to PATCH this chemical instead of creating a new one. Reset to
+// null every time Step 2 (re)renders.
+let wizardUpdateExistingId = null;
+
+async function checkWizardDuplicate(s) {
+  const params = new URLSearchParams();
+  const casNumber = s.casNumber || "";
+  const productName = s.productName || s.chemicalName || "";
+  if (casNumber) params.set("casNumber", casNumber);
+  if (productName) params.set("productName", productName);
+  if (s.manufacturer) params.set("manufacturer", s.manufacturer);
+  if (s.supplier) params.set("supplier", s.supplier);
+  if (!casNumber && !productName) return;
+
+  try {
+    const res = await api(`/chemicals/lookup/find-existing?${params.toString()}`);
+    if (res.match) renderWizardDuplicateBanner(res.match);
+  } catch (err) {
+    console.error("Duplicate check failed:", err);
+  }
+}
+
+function renderWizardDuplicateBanner(match) {
+  const container = document.getElementById("wizardDupeCheck");
+  if (!container) return; // wizard moved on (Back/Cancel) before the check resolved
+  const warnStyle = "background:var(--warn-bg,#3a2c10);border:1px solid var(--warn,#e6a23c);color:var(--warn,#e6a23c);padding:10px 12px;border-radius:var(--radius);font-size:12.5px;margin-bottom:14px;";
+  container.innerHTML = `
+    <div style="${warnStyle}">
+      <strong>Existing Chemical Found</strong>
+      <p style="margin:4px 0 10px;">
+        A chemical matching this SDS may already exist: <strong>${escapeHtml(match.productName || "—")}</strong>${match.casNumber ? ` (CAS ${escapeHtml(match.casNumber)})` : ""}${match.supplier ? ` — Supplier: ${escapeHtml(match.supplier)}` : ""}.
+      </p>
+      <div class="flex gap-8 flex-wrap">
+        <button type="button" class="btn small" id="wizardDupeViewBtn">View Existing</button>
+        <button type="button" class="btn primary small" id="wizardDupeUpdateBtn">Update Existing</button>
+        <button type="button" class="btn ghost small" id="wizardDupeCreateBtn">Create New Anyway</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("wizardDupeViewBtn").addEventListener("click", () => {
+    closeModal();
+    Router.navigate(`/chemical/${match.id}`);
+  });
+  document.getElementById("wizardDupeUpdateBtn").addEventListener("click", () => {
+    wizardUpdateExistingId = match.id;
+    container.innerHTML = `<p class="text-dim" style="font-size:12px;margin-bottom:14px;">Saving will update <strong>${escapeHtml(match.productName || "the existing chemical")}</strong> instead of creating a new one, and add this SDS as a new revision. <button type="button" class="btn ghost small" id="wizardDupeUndoBtn" style="margin-left:8px;">Undo</button></p>`;
+    document.getElementById("wizardDupeUndoBtn").addEventListener("click", () => renderWizardDuplicateBanner(match));
+  });
+  document.getElementById("wizardDupeCreateBtn").addEventListener("click", () => {
+    wizardUpdateExistingId = null;
+    container.innerHTML = "";
+  });
 }
 
 function wv(id) {
@@ -911,28 +971,41 @@ async function saveWizard(file, suggestion) {
       return;
     }
 
-    const chemical = await CHEMICAL_MODULE._services.master.create(chemFields);
+    // "Update Existing" (from the duplicate-check banner above) PATCHes the
+    // matched chemical instead of creating a new one — everything below
+    // (SDS revision, substances) then links to that same existing id. See
+    // checkWizardDuplicate/renderWizardDuplicateBanner and
+    // /chemicals/lookup/find-existing (server/routes/chemicals.js).
+    const isUpdatingExisting = !!wizardUpdateExistingId;
+    const chemical = isUpdatingExisting
+      ? await CHEMICAL_MODULE._services.master.update(wizardUpdateExistingId, chemFields)
+      : await CHEMICAL_MODULE._services.master.create(chemFields);
 
-    // Also create the first Chemical Process Usage record from the same
-    // "Additional Details" inputs, marked primary — a chemical can later be
-    // linked to further processes from its Profile's Process Usage tab. The
-    // flat Chemicals fields above are still written too (unchanged, backward
+    // Also create a Chemical Process Usage record from the same "Additional
+    // Details" inputs (marked primary for a brand-new chemical — a chemical
+    // can later be linked to further processes from its Profile's Process
+    // Usage tab). Skipped when updating an existing chemical: it already has
+    // its own usage record(s); add a new process from the Profile tab
+    // instead if this SDS update also represents a new process. The flat
+    // Chemicals fields above are still written too (unchanged, backward
     // compatible); this is additive. Best-effort like Substances below: a
     // failure here shouldn't undo the chemical/SDS that already saved.
-    try {
-      const PF = CHEMICAL_MODULE.subTables.processUsage.fields;
-      const usageFields = { [PF.chemical]: [chemical.id], [PF.isPrimaryUsage]: true };
-      const putU = (fieldId, val) => { if (val !== "" && val != null) usageFields[fieldId] = val; };
-      putU(PF.process, wv("wz_process"));
-      putU(PF.location, wv("wz_storageLocation"));
-      putU(PF.quantity, wv("wz_quantity"));
-      if (workers !== "") usageFields[PF.workersExposed] = Number(workers);
-      putU(PF.controlMeasures, wv("wz_controlMeasures"));
-      putU(PF.ppe, wv("wz_ppeActuallyUsed"));
-      putU(PF.typeOfUse, wv("wz_typeOfUse"));
-      await CHEMICAL_MODULE._services.sub.processUsage.create(usageFields);
-    } catch (err) {
-      console.error("Could not save the initial process usage record:", err);
+    if (!isUpdatingExisting) {
+      try {
+        const PF = CHEMICAL_MODULE.subTables.processUsage.fields;
+        const usageFields = { [PF.chemical]: [chemical.id], [PF.isPrimaryUsage]: true };
+        const putU = (fieldId, val) => { if (val !== "" && val != null) usageFields[fieldId] = val; };
+        putU(PF.process, wv("wz_process"));
+        putU(PF.location, wv("wz_storageLocation"));
+        putU(PF.quantity, wv("wz_quantity"));
+        if (workers !== "") usageFields[PF.workersExposed] = Number(workers);
+        putU(PF.controlMeasures, wv("wz_controlMeasures"));
+        putU(PF.ppe, wv("wz_ppeActuallyUsed"));
+        putU(PF.typeOfUse, wv("wz_typeOfUse"));
+        await CHEMICAL_MODULE._services.sub.processUsage.create(usageFields);
+      } catch (err) {
+        console.error("Could not save the initial process usage record:", err);
+      }
     }
 
     const SF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
@@ -999,7 +1072,8 @@ async function saveWizard(file, suggestion) {
       }
     }
 
-    toast(substances.length ? `Chemical added, SDS saved, and ${substances.length} substance(s) recorded.` : "Chemical added and SDS saved.");
+    const verb = isUpdatingExisting ? "updated" : "added";
+    toast(substances.length ? `Chemical ${verb}, SDS saved, and ${substances.length} substance(s) recorded.` : `Chemical ${verb} and SDS saved.`);
     closeModal();
   } catch (err) {
     toast(err.message, true);
