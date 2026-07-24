@@ -2,6 +2,7 @@ const schema = require("../lib/schema");
 const airtable = require("../lib/airtable");
 const { buildModuleRouter } = require("../lib/moduleRouter");
 const { buildProfileRoute } = require("../lib/profileAggregation");
+const { getCompanyProfile } = require("../lib/companyProfile");
 
 // The Corrective Actions/CAPA engine — one table, presented in the UI as a
 // single register (default view: Corrective + Preventive; "All Actions" is
@@ -43,7 +44,7 @@ function isOverdue(dueDate, status) {
 router.get("/reports/register-data", async (req, res) => {
   try {
     const F = schema.actions.fields;
-    const records = await airtable.listRecords(schema.actions.tableId);
+    const [company, records] = await Promise.all([getCompanyProfile(), airtable.listRecords(schema.actions.tableId)]);
     const rows = records.map((r) => ({
       id: r.id,
       actionReference: r.fields[F.actionReference] || "",
@@ -61,7 +62,7 @@ router.get("/reports/register-data", async (req, res) => {
       sourceReference: r.fields[F.sourceReference] || "",
       isOverdue: isOverdue(r.fields[F.dueDate], r.fields[F.status]),
     }));
-    res.json({ rows });
+    res.json({ rows, company });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Could not load the Actions register data." });

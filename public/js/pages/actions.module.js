@@ -62,6 +62,7 @@ const ACTION_MODULE = defineBusinessModule({
   registerFilters: {
     dataEndpoint: "/actions/reports/register-data",
     rowsKey: "rows",
+    printReportPath: "/capa/register-report",
     columns: [
       { key: "title", label: "Title", strong: true },
       { key: "actionType", label: "Type" },
@@ -94,3 +95,153 @@ const ACTION_MODULE = defineBusinessModule({
     ],
   },
 });
+
+// ---------------------------------------------------------------------
+// CAPA Register — print/export report, built on ReportEngine (see
+// public/js/pages/chemical.module.js's Chemical Register report for the
+// first use of this pattern). Landscape — 10 columns. Reached from the
+// register page's "Print / Export Report" button (printReportPath above).
+// Reuses the existing /actions/reports/register-data endpoint (now also
+// returning `company`) rather than a new one — prints every action
+// currently in Airtable, not just the on-screen quick-filter's subset.
+// ---------------------------------------------------------------------
+const CAPA_REGISTER_REPORT_VERSION = "v1.0";
+const CAPA_REGISTER_ROWS_PER_PAGE = 14;
+const CAPA_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF = 10;
+
+Router.register("/capa/register-report", async (params, path, isCurrent) => {
+  const view = document.getElementById("view");
+  const isAdmin = Auth.user()?.role === "Admin";
+  view.innerHTML = `<div class="page-loading">Loading…</div>`;
+
+  let data;
+  try {
+    data = await api("/actions/reports/register-data");
+  } catch (err) {
+    if (!isCurrent()) return;
+    console.error(err);
+    view.innerHTML = Components.emptyState("Could not load the CAPA Register data.");
+    return;
+  }
+  if (!isCurrent()) return;
+
+  view.innerHTML = `
+    <div class="no-print">${Components.breadcrumb([
+      { label: "Dashboard", href: "/" },
+      { label: "Corrective Actions (CAPA)", href: "/capa" },
+      { label: "CAPA Register Report" },
+    ])}</div>
+    <div id="capaRegisterReport"></div>
+  `;
+  renderCapaRegisterReport(data, isAdmin);
+});
+
+function renderCapaRegisterReport(data, isAdmin) {
+  const rows = data.rows || [];
+  const pages = ReportEngine.paginate(rows, {
+    perPage: CAPA_REGISTER_ROWS_PER_PAGE,
+    lastPageReserve: CAPA_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF,
+  });
+  const documentNumber = `CAPA-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+
+  const pagesHtml = pages
+    .map((pageRows, idx) => {
+      const showSignoff = idx === pages.length - 1;
+      return `
+    <section class="report-page report-page--landscape">
+      ${idx === 0 ? `
+      <div class="report-title">CORRECTIVE ACTIONS (CAPA) REGISTER</div>
+      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
+      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: CAPA_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ` : ""}
+      <table class="report-table report-table--compact">
+        <thead>
+          <tr>
+            <th>Reference</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assigned To</th>
+            <th>Department</th>
+            <th>Due Date</th>
+            <th>Completed</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pageRows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtml(r.actionReference || "—")}</td>
+              <td>${escapeHtml(r.title || "—")}</td>
+              <td>${escapeHtml(r.actionType || "—")}</td>
+              <td>${escapeHtml(r.priority || "—")}</td>
+              <td>${escapeHtml(r.status || "—")}${r.isOverdue ? " (Overdue)" : ""}</td>
+              <td>${escapeHtml(r.assignedTo || "—")}</td>
+              <td>${escapeHtml(r.assignedDepartment || "—")}</td>
+              <td>${escapeHtml(fmtDate(r.dueDate) || "—")}</td>
+              <td>${escapeHtml(fmtDate(r.completedDate) || "—")}</td>
+              <td>${escapeHtml([r.sourceModule, r.sourceReference].filter(Boolean).join(" — ") || "—")}</td>
+            </tr>`
+            )
+            .join("") || `<tr><td colspan="10" class="text-dim">No actions raised yet.</td></tr>`}
+        </tbody>
+      </table>
+      ${
+        showSignoff
+          ? `
+      <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
+      ${ReportEngine.renderSignatureBlock(
+        {
+          preparedByName: data.company?.defaultPreparedByName,
+          preparedByTitle: data.company?.defaultPreparedByPosition,
+          reviewedByName: data.company?.defaultReviewedByName,
+          reviewedByTitle: data.company?.defaultReviewedByPosition,
+        },
+        "capaReg"
+      )}`
+          : ""
+      }
+      ${ReportEngine.pageNumber(idx + 1, pages.length)}
+    </section>`;
+    })
+    .join("");
+
+  document.getElementById("capaRegisterReport").innerHTML = `
+    <div id="capaRegisterToolbar"></div>
+    ${pagesHtml}
+    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+  `;
+
+  ReportEngine.mountToolbar(document.getElementById("capaRegisterToolbar"), {
+    editHref: isAdmin ? "/admin.html" : null,
+    onPrint: () => window.print(),
+    onExportExcel: () => capaRegisterExportExcel(data),
+  });
+}
+
+async function capaRegisterExportExcel(data) {
+  await ReportEngine.loadExcelJs().catch((err) => {
+    toast(err.message, true);
+    throw err;
+  });
+
+  const rows = data.rows || [];
+  const wb = new window.ExcelJS.Workbook();
+  const ws = ReportEngine.newWorksheet(wb, "CAPA Register", { orientation: "landscape" });
+
+  const cols = ["Reference", "Title", "Type", "Priority", "Status", "Assigned To", "Department", "Due Date", "Completed", "Source"];
+  ws.columns = cols.map(() => ({ width: 18 }));
+  ReportEngine.excelHeaderRow(ws, 1, cols, { freeze: true, repeat: true });
+  rows.forEach((r, idx) => {
+    ReportEngine.excelDataRow(ws, idx + 2, [
+      r.actionReference, r.title, r.actionType, r.priority, r.status + (r.isOverdue ? " (Overdue)" : ""),
+      r.assignedTo, r.assignedDepartment, fmtDate(r.dueDate), fmtDate(r.completedDate),
+      [r.sourceModule, r.sourceReference].filter(Boolean).join(" — "),
+    ]);
+  });
+
+  await ReportEngine.downloadWorkbook(wb, `capa-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
