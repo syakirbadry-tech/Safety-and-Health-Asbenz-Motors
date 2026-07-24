@@ -717,7 +717,7 @@ function substancesPreviewHtml(substances) {
   }
   return `
     <div class="table-wrap" style="margin-top:8px;">
-      <table class="dosh-table">
+      <table class="report-table">
         <thead><tr><th>Chemical Name</th><th>CAS No.</th><th>Concentration</th><th>Signal Word</th></tr></thead>
         <tbody>
           ${list.map((sub) => `
@@ -972,6 +972,7 @@ const DOSH_GEN_FIELDS = {
 // same sheet, matching the guideline's own Appendix 5 pagination.
 const DOSH_ROWS_PER_PAGE = 8;
 const DOSH_ROWS_LAST_PAGE_WITH_C = 5;
+const DOSH_REPORT_VERSION = "v2.1";
 
 Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   const view = document.getElementById("view");
@@ -1000,71 +1001,47 @@ Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   renderDoshReport(data, isAdmin);
 });
 
-// Splits Section B's rows into per-page chunks — see DOSH_ROWS_PER_PAGE /
-// DOSH_ROWS_LAST_PAGE_WITH_C above.
-function doshBuildPages(rows) {
-  const pages = [];
-  let i = 0;
-  while (i < rows.length) {
-    const remaining = rows.length - i;
-    const size = remaining <= DOSH_ROWS_LAST_PAGE_WITH_C ? remaining : DOSH_ROWS_PER_PAGE;
-    pages.push(rows.slice(i, i + size));
-    i += size;
-  }
-  if (!pages.length) pages.push([]);
-  return pages;
-}
-
-// One bordered box per character, matching the guideline's actual form
-// fill-in style for Section A (verified against the extracted PDF text,
-// which shows single-letter-spacing boxes throughout every field).
-function doshCharBoxes(value) {
-  const chars = String(value || "").split("");
-  if (!chars.length) return `<div class="dosh-charbox-row"></div>`;
-  return `<div class="dosh-charbox-row">${chars
-    .map((ch) => `<span class="dosh-charbox">${ch === " " ? "" : escapeHtml(ch)}</span>`)
-    .join("")}</div>`;
-}
-
 function renderDoshReport(data, isAdmin) {
   const c = data.company || {};
   const activities = c.companyActivity || [];
   const activityMark = (name) => (activities.includes(name) ? "✓" : "");
-  const pages = doshBuildPages(data.rows);
+  const pages = ReportEngine.paginate(data.rows, { perPage: DOSH_ROWS_PER_PAGE, lastPageReserve: DOSH_ROWS_LAST_PAGE_WITH_C });
   const pageCount = pages.length + 1; // +1 for Section A's own page
+  const documentNumber = `DOSH-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
 
   const sectionAHtml = `
-    <section class="dosh-page">
-      <div class="dosh-title">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</div>
+    <section class="report-page report-page--landscape">
+      <div class="report-title">REGISTER OF CHEMICALS HAZARDOUS TO HEALTH</div>
       <p style="text-align:center;font-size:10.5px;" class="text-dim">Prepared under the Occupational Safety and Health (Use and Standard of Exposure of Chemicals Hazardous to Health) Regulations 2000</p>
+      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: DOSH_REPORT_VERSION, generatedAt: new Date().toISOString() })}
 
-      <div class="dosh-section-head">SECTION A : COMPANY INFORMATION</div>
-      <div class="dosh-form-box">
-        <div class="dosh-form-row"><label>Name</label>${doshCharBoxes(c.companyName)}</div>
-        <p class="dosh-form-note">(Refer to Appendix 2 for Code of Sector and Appendix 3 for Class of Industry)</p>
-        <div class="dosh-form-row"><label>Address</label>${doshCharBoxes(c.address)}</div>
-        <div class="dosh-form-row dosh-form-row-split">
-          <div class="dosh-form-row"><label>City</label>${doshCharBoxes(c.city)}</div>
-          <div class="dosh-form-row"><label>Postcode</label>${doshCharBoxes(c.postcode)}</div>
+      <div class="report-section-head">SECTION A : COMPANY INFORMATION</div>
+      <div class="report-form-box">
+        <div class="report-form-row"><label>Name</label>${ReportEngine.charBoxes(c.companyName)}</div>
+        <p class="report-form-note">(Refer to Appendix 2 for Code of Sector and Appendix 3 for Class of Industry)</p>
+        <div class="report-form-row"><label>Address</label>${ReportEngine.charBoxes(c.address)}</div>
+        <div class="report-form-row report-form-row-split">
+          <div class="report-form-row"><label>City</label>${ReportEngine.charBoxes(c.city)}</div>
+          <div class="report-form-row"><label>Postcode</label>${ReportEngine.charBoxes(c.postcode)}</div>
         </div>
-        <div class="dosh-form-row"><label>State</label>${doshCharBoxes(c.state)}</div>
-        <div class="dosh-form-row"><label>Telephone No.</label>${doshCharBoxes(c.telephone)}</div>
-        <div class="dosh-form-row"><label>Email</label>${doshCharBoxes(c.email)}</div>
-        <div class="dosh-form-row"><label>DOSH Registration No.</label>${doshCharBoxes(c.doshRegistrationNo)}</div>
-        <div class="dosh-form-row dosh-form-row-split">
-          <div class="dosh-form-row"><label>Code of Sector</label>${doshCharBoxes(c.codeOfSector)}</div>
-          <div class="dosh-form-row"><label>Class of Industry</label>${doshCharBoxes(c.classOfIndustry)}</div>
+        <div class="report-form-row"><label>State</label>${ReportEngine.charBoxes(c.state)}</div>
+        <div class="report-form-row"><label>Telephone No.</label>${ReportEngine.charBoxes(c.telephone)}</div>
+        <div class="report-form-row"><label>Email</label>${ReportEngine.charBoxes(c.email)}</div>
+        <div class="report-form-row"><label>DOSH Registration No.</label>${ReportEngine.charBoxes(c.doshRegistrationNo)}</div>
+        <div class="report-form-row report-form-row-split">
+          <div class="report-form-row"><label>Code of Sector</label>${ReportEngine.charBoxes(c.codeOfSector)}</div>
+          <div class="report-form-row"><label>Class of Industry</label>${ReportEngine.charBoxes(c.classOfIndustry)}</div>
         </div>
         <div style="margin-top:8px;">
           <div style="font-weight:600;margin-bottom:4px;">Company Activity (Please enter ( / ) in the appropriate box):</div>
-          <div class="dosh-activity-grid">
+          <div class="report-check-grid">
             ${["Manufacturer", "Importer", "Distributor", "Formulator", "End-User"]
-              .map((name) => `<div>${name}</div><div class="dosh-activity-box">${activityMark(name)}</div>`)
+              .map((name) => `<div>${name}</div><div class="report-check-box">${activityMark(name)}</div>`)
               .join("")}
           </div>
         </div>
       </div>
-      <div class="dosh-page-number">Page 1 of ${pageCount}</div>
+      ${ReportEngine.pageNumber(1, pageCount)}
     </section>
   `;
 
@@ -1072,14 +1049,14 @@ function renderDoshReport(data, isAdmin) {
     .map((rows, idx) => {
       const showC = idx === pages.length - 1;
       return `
-    <section class="dosh-page">
-      <div class="dosh-section-head">SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH</div>
-      <div class="dosh-b-meta">
+    <section class="report-page report-page--landscape">
+      <div class="report-section-head">SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH</div>
+      <div class="report-meta-strip">
         <div>Location: <strong>${escapeHtml(rows[0]?.storageLocation || "—")}</strong></div>
         <div>Process Operation: <strong>${escapeHtml(rows[0]?.process || "—")}</strong></div>
         <div>No. of Hazardous Chemicals: <strong>${data.chemicalCount ?? data.rows.length}</strong></div>
       </div>
-      <table class="dosh-table dosh-table-b">
+      <table class="report-table report-table--compact">
         <colgroup>
           ${[10, 12, 6, 6, 14, 5, 4, 5, 5, 5, 5, 7, 6, 5, 5].map((pct) => `<col style="width:${pct}%">`).join("")}
         </colgroup>
@@ -1133,67 +1110,57 @@ function renderDoshReport(data, isAdmin) {
       ${
         showC
           ? `
-      <div class="dosh-section-head" style="margin-top:14px;">SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED</div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;gap:20px;">
-        <div>
-          <div class="field"><label>Prepared By — Name</label><input type="text" id="doshPreparedName" value="${escapeHtml(c.defaultPreparedByName || "")}" /></div>
-          <div class="field"><label>Prepared By — Title</label><input type="text" id="doshPreparedTitle" value="${escapeHtml(c.defaultPreparedByPosition || "")}" /></div>
-        </div>
-        <div>
-          <div class="field"><label>Reviewed By — Name</label><input type="text" id="doshReviewedName" value="${escapeHtml(c.defaultReviewedByName || "")}" /></div>
-          <div class="field"><label>Reviewed By — Title</label><input type="text" id="doshReviewedTitle" value="${escapeHtml(c.defaultReviewedByPosition || "")}" /></div>
-        </div>
-      </div>
+      <div class="report-section-head" style="margin-top:14px;">SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED</div>
+      ${ReportEngine.renderSignatureBlock(
+        {
+          preparedByName: c.defaultPreparedByName,
+          preparedByTitle: c.defaultPreparedByPosition,
+          reviewedByName: c.defaultReviewedByName,
+          reviewedByTitle: c.defaultReviewedByPosition,
+        },
+        "dosh"
+      )}
       <p class="text-dim no-print" style="font-size:11px;margin-top:6px;">Pre-filled from Company Profile (Admin → Company Profile) — still editable for this generation.</p>`
           : ""
       }
-      <div class="dosh-page-number">Page ${idx + 2} of ${pageCount}</div>
+      ${ReportEngine.pageNumber(idx + 2, pageCount)}
     </section>`;
     })
     .join("");
 
   document.getElementById("doshReport").innerHTML = `
-    <div class="no-print flex gap-8" style="justify-content:flex-end;margin-bottom:14px;">
-      ${isAdmin ? `<a class="btn small" href="/admin.html" target="_blank" rel="noopener">Edit Company Profile</a>` : ""}
-      <button class="btn small" id="doshExportExcelBtn">Export Excel</button>
-      <button class="btn primary small" id="doshPrintBtn">Print / Save as PDF</button>
-    </div>
+    <div id="doshToolbar"></div>
     ${sectionAHtml}
     ${sectionBHtml}
     <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
   `;
 
   async function logDoshGeneration(exportFormat) {
-    try {
-      const me = Auth.user();
-      await api("/dosh-register-generations", {
-        method: "POST",
-        body: {
-          fields: {
-            [DOSH_GEN_FIELDS.generationReference]: `DOSH-REG-${Date.now()}`,
-            [DOSH_GEN_FIELDS.generatedDate]: new Date().toISOString(),
-            [DOSH_GEN_FIELDS.generatedBy]: me?.fullName || me?.email || "Unknown",
-            [DOSH_GEN_FIELDS.preparedByName]: document.getElementById("doshPreparedName")?.value || "",
-            [DOSH_GEN_FIELDS.preparedByTitle]: document.getElementById("doshPreparedTitle")?.value || "",
-            [DOSH_GEN_FIELDS.reviewedByName]: document.getElementById("doshReviewedName")?.value || "",
-            [DOSH_GEN_FIELDS.reviewedByTitle]: document.getElementById("doshReviewedTitle")?.value || "",
-            [DOSH_GEN_FIELDS.exportFormat]: exportFormat,
-          },
-        },
-      });
-    } catch (err) {
-      console.error("Could not log DOSH register generation:", err);
-    }
+    const me = Auth.user();
+    await ReportEngine.logGeneration("/dosh-register-generations", {
+      fields: {
+        [DOSH_GEN_FIELDS.generationReference]: `DOSH-REG-${Date.now()}`,
+        [DOSH_GEN_FIELDS.generatedDate]: new Date().toISOString(),
+        [DOSH_GEN_FIELDS.generatedBy]: me?.fullName || me?.email || "Unknown",
+        [DOSH_GEN_FIELDS.preparedByName]: document.getElementById("doshPreparedName")?.value || "",
+        [DOSH_GEN_FIELDS.preparedByTitle]: document.getElementById("doshPreparedTitle")?.value || "",
+        [DOSH_GEN_FIELDS.reviewedByName]: document.getElementById("doshReviewedName")?.value || "",
+        [DOSH_GEN_FIELDS.reviewedByTitle]: document.getElementById("doshReviewedTitle")?.value || "",
+        [DOSH_GEN_FIELDS.exportFormat]: exportFormat,
+      },
+    });
   }
 
-  document.getElementById("doshPrintBtn").addEventListener("click", async () => {
-    await logDoshGeneration("PDF");
-    window.print();
-  });
-
-  document.getElementById("doshExportExcelBtn").addEventListener("click", async () => {
-    await logDoshGeneration("Excel");
-    doshExportExcel(data);
+  ReportEngine.mountToolbar(document.getElementById("doshToolbar"), {
+    editHref: isAdmin ? "/admin.html" : null,
+    onPrint: async () => {
+      await logDoshGeneration("PDF");
+      window.print();
+    },
+    onExportExcel: async () => {
+      await logDoshGeneration("Excel");
+      doshExportExcel(data);
+    },
   });
 }
 
@@ -1207,36 +1174,17 @@ function renderDoshReport(data, isAdmin) {
 // the guideline's actual merged/bordered Section A/B/C layout.
 // ---------------------------------------------------------------------
 async function doshExportExcel(data) {
-  if (!window.ExcelJS) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
-      s.onload = resolve;
-      s.onerror = () => reject(new Error("Could not load the Excel export library."));
-      document.head.appendChild(s);
-    }).catch((err) => {
-      toast(err.message, true);
-      throw err;
-    });
-  }
+  await ReportEngine.loadExcelJs().catch((err) => {
+    toast(err.message, true);
+    throw err;
+  });
 
   const c = data.company || {};
   const rows = data.rows || [];
   const wb = new window.ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Chemical Register", {
-    pageSetup: {
-      orientation: "landscape",
-      fitToPage: true,
-      fitToWidth: 1,
-      fitToHeight: 0,
-      paperSize: 9,
-      margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0, footer: 0 },
-    },
-    views: [{ showGridLines: false }],
-  });
+  const ws = ReportEngine.newWorksheet(wb, "Chemical Register", { orientation: "landscape" });
+  const border = ReportEngine.EXCEL_BORDER;
 
-  const thin = { style: "thin", color: { argb: "FF000000" } };
-  const border = { top: thin, left: thin, bottom: thin, right: thin };
   const cols = [
     "Product Name", "Name of Chemical", "CAS No.", "Physical Form", "Active Ingredients",
     "Quantity", "Type#", "Class", "CSDS (Y/N)", "Label (Y/N)", "Workers Exposed",
@@ -1253,38 +1201,18 @@ async function doshExportExcel(data) {
   titleCell.border = border;
   ws.getRow(1).height = 22;
 
-  function sectionHead(row, text) {
-    ws.mergeCells(row, 1, row, cols.length);
-    const cell = ws.getCell(row, 1);
-    cell.value = text;
-    cell.font = { bold: true, size: 11, name: "Arial", color: { argb: "FFFFFFFF" } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF000000" } };
-  }
-  sectionHead(2, "SECTION A : COMPANY INFORMATION");
+  ReportEngine.excelSectionHead(ws, 2, "SECTION A : COMPANY INFORMATION", cols.length);
+  ReportEngine.excelInfoRow(ws, 3, [["Name", c.companyName || ""], ["DOSH Reg. No.", c.doshRegistrationNo || ""]], cols.length);
+  ReportEngine.excelInfoRow(ws, 4, [["Address", c.address || ""], ["Code of Sector", c.codeOfSector || ""]], cols.length);
+  ReportEngine.excelInfoRow(ws, 5, [["City / Postcode", [c.city, c.postcode].filter(Boolean).join(" / ")], ["Class of Industry", c.classOfIndustry || ""]], cols.length);
+  ReportEngine.excelInfoRow(ws, 6, [["State", c.state || ""], ["Telephone", c.telephone || ""]], cols.length);
+  ReportEngine.excelInfoRow(ws, 7, [["Email", c.email || ""], ["Company Activity", (c.companyActivity || []).join(", ")]], cols.length);
 
-  function addInfoRow(r, pairs) {
-    let col = 1;
-    pairs.forEach(([label, value]) => {
-      const span = Math.floor(cols.length / pairs.length);
-      const lc = ws.getCell(r, col);
-      lc.value = label;
-      lc.font = { bold: true, size: 9, name: "Arial" };
-      lc.border = border;
-      ws.mergeCells(r, col + 1, r, col + span - 1);
-      const vc = ws.getCell(r, col + 1);
-      vc.value = value;
-      vc.font = { size: 9, name: "Arial" };
-      vc.border = border;
-      col += span + 1;
-    });
-  }
-  addInfoRow(3, [["Name", c.companyName || ""], ["DOSH Reg. No.", c.doshRegistrationNo || ""]]);
-  addInfoRow(4, [["Address", c.address || ""], ["Code of Sector", c.codeOfSector || ""]]);
-  addInfoRow(5, [["City / Postcode", [c.city, c.postcode].filter(Boolean).join(" / ")], ["Class of Industry", c.classOfIndustry || ""]]);
-  addInfoRow(6, [["State", c.state || ""], ["Telephone", c.telephone || ""]]);
-  addInfoRow(7, [["Email", c.email || ""], ["Company Activity", (c.companyActivity || []).join(", ")]]);
-
-  sectionHead(8, "SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH");
+  ReportEngine.excelSectionHead(ws, 8, "SECTION B : LIST OF CHEMICALS HAZARDOUS TO HEALTH", cols.length);
+  // Two-row grouped header (Type of Control Measures spans Engineering
+  // Control/PPE) doesn't fit ReportEngine.excelHeaderRow's simple single-row
+  // shape, so it stays bespoke here — every other section reuses the shared
+  // helpers above.
   const groupRow = 9;
   const headerRow = 10;
   ws.mergeCells(groupRow, CTRL_START, groupRow, CTRL_START + 1);
@@ -1317,24 +1245,15 @@ async function doshExportExcel(data) {
   ws.pageSetup.printTitlesRow = `${groupRow}:${headerRow}`;
 
   rows.forEach((r, idx) => {
-    const row = ws.getRow(headerRow + 1 + idx);
-    const vals = [
+    ReportEngine.excelDataRow(ws, headerRow + 1 + idx, [
       r.productName, r.chemicalName, r.casNumber, r.physicalForm, r.activeIngredients,
       r.quantity, r.typeCode, r.hazardClass, r.csds, r.label, r.workersExposed,
       r.typeOfUse, r.controlMeasures, r.ppeActuallyUsed, r.supplier,
-    ];
-    vals.forEach((v, i) => {
-      const cell = row.getCell(i + 1);
-      cell.value = v ?? "";
-      cell.font = { size: 9, name: "Arial" };
-      cell.alignment = { wrapText: true, vertical: "top" };
-      cell.border = border;
-    });
-    row.height = 26;
+    ]).height = 26;
   });
 
-  let sigRow = headerRow + rows.length + 2;
-  sectionHead(sigRow, "SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED");
+  const sigRow = headerRow + rows.length + 2;
+  ReportEngine.excelSectionHead(ws, sigRow, "SECTION C : NAME OF PERSON WHO PREPARED OR REVIEWED", cols.length);
   const half = Math.floor(cols.length / 2);
   function sigLine(r, label) {
     ws.mergeCells(r, 1, r, half);
@@ -1348,12 +1267,5 @@ async function doshExportExcel(data) {
   sigLine(sigRow + 2, `Reviewed By — Name: ${document.getElementById("doshReviewedName")?.value || ""}   Title: ${document.getElementById("doshReviewedTitle")?.value || ""}`);
   ws.pageSetup.printArea = `A1:${String.fromCharCode(64 + cols.length)}${sigRow + 2}`;
 
-  const buf = await wb.xlsx.writeBuffer();
-  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `dosh-chemical-register-${new Date().toISOString().slice(0, 10)}.xlsx`;
-  a.click();
-  URL.revokeObjectURL(url);
+  await ReportEngine.downloadWorkbook(wb, `dosh-chemical-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
