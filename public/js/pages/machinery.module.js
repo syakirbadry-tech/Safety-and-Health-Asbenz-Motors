@@ -21,6 +21,7 @@ const MACHINERY_MODULE = defineBusinessModule({
   statusDateField: "Next Inspection Due",
   masterCountLabel: "Registered Machines",
   masterCountLabelReports: "Total Machines",
+  relatedLinks: [{ label: "Print / Export Report", path: "/machinery/register-report" }],
 
   registerColumns: [
     { key: "name", label: "Machine Name", field: "Machine Name", strong: true },
@@ -234,3 +235,157 @@ const MACHINERY_MODULE = defineBusinessModule({
 // keys ("cf", "pm", "cm", "inspection", "calibration", "hirarc") — see
 // server/routes/machinery.js's buildProfileRoute call, which must stay in
 // sync with the subTables/riskAssessment keys above.
+
+// ---------------------------------------------------------------------
+// Machinery Register — print/export report, built on ReportEngine (see
+// public/js/pages/chemical.module.js's Chemical Register report for the
+// first use of this pattern). Landscape — 11 columns doesn't fit A4
+// portrait cleanly. Reached from the Machinery Dashboard's "Print / Export
+// Report" quick-action (relatedLinks above), since Machinery uses the
+// plain registerColumns register (no Filter/Search toolbar to hang a
+// printReportPath button off, unlike Chemical/CAPA's registerFilters).
+// ---------------------------------------------------------------------
+const MACHINERY_REGISTER_REPORT_VERSION = "v1.0";
+const MACHINERY_REGISTER_ROWS_PER_PAGE = 14;
+const MACHINERY_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF = 10;
+
+Router.register("/machinery/register-report", async (params, path, isCurrent) => {
+  const view = document.getElementById("view");
+  const isAdmin = Auth.user()?.role === "Admin";
+  view.innerHTML = `<div class="page-loading">Loading…</div>`;
+
+  let data;
+  try {
+    data = await api("/machinery/reports/register-data");
+  } catch (err) {
+    if (!isCurrent()) return;
+    console.error(err);
+    view.innerHTML = Components.emptyState("Could not load the Machinery Register data.");
+    return;
+  }
+  if (!isCurrent()) return;
+
+  view.innerHTML = `
+    <div class="no-print">${Components.breadcrumb([
+      { label: "Dashboard", href: "/" },
+      { label: "Machinery", href: "/machinery" },
+      { label: "Machinery Register Report" },
+    ])}</div>
+    <div id="machineryRegisterReport"></div>
+  `;
+  renderMachineryRegisterReport(data, isAdmin);
+});
+
+function renderMachineryRegisterReport(data, isAdmin) {
+  const rows = data.rows || [];
+  const pages = ReportEngine.paginate(rows, {
+    perPage: MACHINERY_REGISTER_ROWS_PER_PAGE,
+    lastPageReserve: MACHINERY_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF,
+  });
+  const documentNumber = `MACH-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+
+  const pagesHtml = pages
+    .map((pageRows, idx) => {
+      const showSignoff = idx === pages.length - 1;
+      return `
+    <section class="report-page report-page--landscape">
+      ${idx === 0 ? `
+      <div class="report-title">MACHINERY REGISTER</div>
+      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
+      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: MACHINERY_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ` : ""}
+      <table class="report-table report-table--compact">
+        <thead>
+          <tr>
+            <th>Machine Name</th>
+            <th>Asset Tag</th>
+            <th>Category</th>
+            <th>Location</th>
+            <th>Operational Status</th>
+            <th>Responsible Person</th>
+            <th>Last Inspection</th>
+            <th>Next Inspection Due</th>
+            <th>DOSH Cert No.</th>
+            <th>Compliance Status</th>
+            <th>License Expiry</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pageRows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtml(r.machineName || "—")}</td>
+              <td>${escapeHtml(r.assetTag || "—")}</td>
+              <td>${escapeHtml(r.category || "—")}</td>
+              <td>${escapeHtml(r.location || "—")}</td>
+              <td>${escapeHtml(r.operationalStatus || "—")}</td>
+              <td>${escapeHtml(r.responsiblePerson || "—")}</td>
+              <td>${escapeHtml(fmtDate(r.lastInspectionDate) || "—")}</td>
+              <td>${escapeHtml(fmtDate(r.nextInspectionDue) || "—")}</td>
+              <td>${escapeHtml(r.doshCertNo || "—")}</td>
+              <td>${escapeHtml(r.complianceStatus || "—")}</td>
+              <td>${escapeHtml(fmtDate(r.licenseExpiryDate) || "—")}</td>
+            </tr>`
+            )
+            .join("") || `<tr><td colspan="11" class="text-dim">No machinery registered yet.</td></tr>`}
+        </tbody>
+      </table>
+      ${
+        showSignoff
+          ? `
+      <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
+      ${ReportEngine.renderSignatureBlock(
+        {
+          preparedByName: data.company?.defaultPreparedByName,
+          preparedByTitle: data.company?.defaultPreparedByPosition,
+          reviewedByName: data.company?.defaultReviewedByName,
+          reviewedByTitle: data.company?.defaultReviewedByPosition,
+        },
+        "machReg"
+      )}`
+          : ""
+      }
+      ${ReportEngine.pageNumber(idx + 1, pages.length)}
+    </section>`;
+    })
+    .join("");
+
+  document.getElementById("machineryRegisterReport").innerHTML = `
+    <div id="machineryRegisterToolbar"></div>
+    ${pagesHtml}
+    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+  `;
+
+  ReportEngine.mountToolbar(document.getElementById("machineryRegisterToolbar"), {
+    editHref: isAdmin ? "/admin.html" : null,
+    onPrint: () => window.print(),
+    onExportExcel: () => machineryRegisterExportExcel(data),
+  });
+}
+
+async function machineryRegisterExportExcel(data) {
+  await ReportEngine.loadExcelJs().catch((err) => {
+    toast(err.message, true);
+    throw err;
+  });
+
+  const rows = data.rows || [];
+  const wb = new window.ExcelJS.Workbook();
+  const ws = ReportEngine.newWorksheet(wb, "Machinery Register", { orientation: "landscape" });
+
+  const cols = [
+    "Machine Name", "Asset Tag", "Category", "Location", "Operational Status", "Responsible Person",
+    "Last Inspection", "Next Inspection Due", "DOSH Cert No.", "Compliance Status", "License Expiry",
+  ];
+  ws.columns = cols.map(() => ({ width: 18 }));
+  ReportEngine.excelHeaderRow(ws, 1, cols, { freeze: true, repeat: true });
+  rows.forEach((r, idx) => {
+    ReportEngine.excelDataRow(ws, idx + 2, [
+      r.machineName, r.assetTag, r.category, r.location, r.operationalStatus, r.responsiblePerson,
+      fmtDate(r.lastInspectionDate), fmtDate(r.nextInspectionDue), r.doshCertNo, r.complianceStatus, fmtDate(r.licenseExpiryDate),
+    ]);
+  });
+
+  await ReportEngine.downloadWorkbook(wb, `machinery-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}

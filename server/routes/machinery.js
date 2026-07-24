@@ -5,6 +5,7 @@ const { buildModuleRouter } = require("../lib/moduleRouter");
 const { buildProfileRoute } = require("../lib/profileAggregation");
 const { extractLicenseData } = require("../lib/extract");
 const { logActivity } = require("../lib/activity");
+const { getCompanyProfile } = require("../lib/companyProfile");
 
 const router = buildModuleRouter({
   moduleName: "Machinery",
@@ -16,6 +17,42 @@ const router = buildModuleRouter({
     serviceHistory: schema.machinery.fields.serviceHistory,
     photos: schema.machinery.fields.photos,
   },
+});
+
+// GET /reports/register-data — flat display rows + company branding for the
+// Machinery Register print/export report (public/js/pages/machinery.module.js,
+// ReportEngine). Same aggregation-endpoint convention as
+// chemicals.js's /reports/register-data.
+//
+// Must be a 2+ segment path — buildModuleRouter above already registered
+// GET "/:id", which (being a single path segment) would shadow a single-
+// segment GET registered after it, since Express matches in registration
+// order.
+router.get("/reports/register-data", async (req, res) => {
+  try {
+    const MF = schema.machinery.fields;
+    const [company, machines] = await Promise.all([getCompanyProfile(), airtable.listRecords(schema.machinery.tableId)]);
+
+    const rows = machines.map((r) => ({
+      id: r.id,
+      machineName: r.fields[MF.machineName] || "",
+      assetTag: r.fields[MF.assetTag] || "",
+      category: r.fields[MF.category] || "",
+      location: r.fields[MF.location] || "",
+      operationalStatus: r.fields[MF.operationalStatus] || "",
+      responsiblePerson: r.fields[MF.responsiblePerson] || "",
+      lastInspectionDate: r.fields[MF.lastInspectionDate] || "",
+      nextInspectionDue: r.fields[MF.nextInspectionDue] || "",
+      doshCertNo: r.fields[MF.doshCertNo] || "",
+      complianceStatus: r.fields[MF.complianceStatus] || "",
+      licenseExpiryDate: r.fields[MF.licenseExpiryDate] || "",
+    }));
+
+    res.json({ company, rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not load Machinery Register data." });
+  }
 });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
