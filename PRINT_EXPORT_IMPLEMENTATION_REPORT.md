@@ -52,3 +52,12 @@ Verification used a throwaway `dev-verify@local.test` Admin account (seeded via 
 - **Excel export is verified for successful download, not cell-by-cell content**, beyond the DOSH report (which was already covered by the pre-refactor implementation's own prior verification). The other five reports' Excel sheets use the same helper functions and weren't separately opened and inspected in Excel/Numbers.
 - **`.report-page--landscape`'s named `@page` CSS is a modern-Chrome feature** (same engine dependency the pre-existing DOSH implementation already had via `break-after`/`break-inside`) — not verified in Firefox or Safari's print pipeline.
 - **Generation audit logging stays DOSH-only.** The other five reports don't write to a "Generations" table on export (no such tables exist for them) — this was an explicit scope decision (ARCHITECTURE.md §5.6), not an oversight, but flagging it here since the DOSH report does log and the others silently don't.
+
+## Update — Company Profile as central administration
+
+A follow-on pass (ARCHITECTURE.md §5.7, `COMPANY_PROFILE_IMPLEMENTATION_REPORT.md`) made `ReportEngine`'s primitives company-driven and expanded Company Profile into the admin surface for branding, document defaults, a third Approved By signatory with signature images, and 10 export-setting toggles. That pass closed two of the limitations above with real uploaded-image verification:
+
+- Logo/branding rendering **was** confirmed against a real uploaded image (not just the empty-placeholder path) — including an admin-set Primary Colour correctly applying to section headers/title borders on non-DOSH reports and confirmed absent on DOSH.
+- A toggled-off Export Setting (Show Page Numbers) was confirmed to actually disappear from a real report's output and reappear when re-enabled — not just render without erroring.
+
+Still open from the original list: CAPA/OSH Committee still haven't been seen with populated (non-empty) real data in this environment, and Excel sheet content still hasn't been cell-by-cell verified beyond DOSH.
