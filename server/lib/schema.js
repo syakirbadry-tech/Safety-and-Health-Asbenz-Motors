@@ -566,6 +566,11 @@ module.exports = {
       machinery: "fld2JyufVV3pRR479",
       complianceStatus: "fld66TA1vtTz1vZ33",
       documentType: "fldPKYLr0CPHS8jq4",
+      // Optional (v2.2) — ties an Emergency Spill Procedure to the
+      // chemical(s) it covers, surfaced read-only on the Chemical Profile
+      // page (chemical.module.js's extraProfileTabs). SOPs without this set
+      // keep working exactly as before, still filterable by documentType.
+      chemical: "fld2ooWTT3S3HZIS3",
     },
   },
 };

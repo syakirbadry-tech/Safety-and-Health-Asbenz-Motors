@@ -261,6 +261,7 @@ router.get(
       { key: "chra", tableId: schema.chra.tableId, linkFieldId: schema.chra.fields.chemicalLink },
       { key: "substances", tableId: schema.substances.tableId, linkFieldId: schema.substances.fields.chemical },
       { key: "processUsage", tableId: schema.chemicalProcessUsage.tableId, linkFieldId: schema.chemicalProcessUsage.fields.chemical },
+      { key: "sop", tableId: schema.sop.tableId, linkFieldId: schema.sop.fields.chemical },
     ],
     postProcess: (result, master) => {
       result.complianceSummary = buildComplianceSummary(master, result.subTables);

@@ -426,6 +426,45 @@ const CHEMICAL_MODULE = defineBusinessModule({
       condition: (record) => record.fields[MODULES.chemicals.fields["Health Surveillance Required"]] === "Yes",
       render: () => conditionalModulePlaceholder("Health Surveillance"),
     },
+    // v2.2 — read-only: any SOP whose optional new Chemical link field
+    // (schema.js's sop.fields.chemical) includes this chemical, most
+    // usefully an Emergency Spill Procedure. No condition (always shown,
+    // unlike the assessor-set flags above) — an empty list here just means
+    // no SOP has been linked to this chemical yet, not a missing assessment.
+    // Editing/linking happens from the SOP module itself; this tab is purely
+    // a read-only cross-reference, matching the plan's "surface, don't
+    // duplicate" principle.
+    {
+      key: "emergencyResponse",
+      label: "Emergency Response",
+      render: (record, profile) => {
+        const sopRecords = profile.subTables.sop || [];
+        if (!sopRecords.length) {
+          return Components.emptyState('No SOP linked to this chemical yet. In the SOP module, set a record\'s "Chemical" field to link it here — most usefully an Emergency Spill Procedure (Document Type = "Spill Response").');
+        }
+        const f = MODULES.sop.fields;
+        const rows = sopRecords.map((r) => ({
+          cells: {
+            title: escapeHtml(r.fields[f["SOP Title"]] || "—"),
+            documentType: escapeHtml(r.fields[f["Document Type"]] || "—"),
+            version: escapeHtml(r.fields[f["Version"]] || "—"),
+            reviewDue: fmtDate(r.fields[f["Review Due Date"]]),
+            approvedBy: escapeHtml(r.fields[f["Approved By"]] || "—"),
+          },
+        }));
+        return Components.dataTable({
+          columns: [
+            { key: "title", label: "Procedure" },
+            { key: "documentType", label: "Document Type" },
+            { key: "version", label: "Version" },
+            { key: "reviewDue", label: "Review Due" },
+            { key: "approvedBy", label: "Approved By" },
+          ],
+          rows,
+          emptyLabel: "No SOP linked to this chemical yet.",
+        });
+      },
+    },
   ],
 
   attachmentsNote: 'To upload or replace files, use "Edit / Manage Files" above, or manage SDS revisions from the SDS tab.',
