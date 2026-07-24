@@ -79,10 +79,12 @@ Router.register("/", async (params, path, isCurrent) => {
   const chemKpiEl = document.getElementById("dashboardKpisChemical");
   try {
     const chemSvc = CHEMICAL_MODULE._services;
-    const [chemicals, sdsDocs, storageInsp] = await Promise.all([
+    const [chemicals, sdsDocs, storageInsp, labelInsp, processUsage] = await Promise.all([
       chemSvc.master.list(),
       chemSvc.sub.sdsDocuments.list(),
       chemSvc.sub.storageInspection.list(),
+      chemSvc.sub.labelInspection.list(),
+      chemSvc.sub.processUsage.list(),
     ]);
     const sdsF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
     const storageF = CHEMICAL_MODULE.subTables.storageInspection.fields;
@@ -93,12 +95,20 @@ Router.register("/", async (params, path, isCurrent) => {
       const d = daysUntil(r.fields[storageF.nextDue]);
       return d !== null && d <= 30;
     }).length;
+    const dataByKey = { sdsDocuments: sdsDocs, labelInspection: labelInsp, processUsage };
+    const requiresAttention = chemicals.filter((c) => clientChemicalCompletion(c, dataByKey).requiresAttention).length;
 
     if (!isCurrent()) return;
     chemKpiEl.innerHTML = Components.kpiRow([
       { label: "Registered Chemicals", value: chemicals.length, tone: "neutral", navigate: "/chemical/register" },
       { label: "Expired SDS", value: expiredSds, tone: expiredSds ? "bad" : "ok", navigate: "/chemical/register" },
       { label: "Storage Inspections Due (30d)", value: storageDue, tone: storageDue ? "warn" : "ok", navigate: "/chemical/register" },
+      {
+        label: "DOSH Register Completion",
+        value: `${chemicals.length - requiresAttention}/${chemicals.length}`,
+        tone: requiresAttention ? "warn" : "ok",
+        navigate: "/chemical/register",
+      },
     ]);
   } catch (err) {
     if (!isCurrent()) return;

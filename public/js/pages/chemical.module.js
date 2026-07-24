@@ -453,6 +453,15 @@ const CHEMICAL_MODULE = defineBusinessModule({
           ? `<button type="button" class="btn small" data-view-file="/sds-documents:${row.currentSdsId}:fldwdrQQpzpboQZta">📄 View SDS</button>`
           : `<span class="text-dim">—</span>`,
       },
+      {
+        key: "doshCompletion",
+        label: "DOSH Complete",
+        render: (row) => {
+          const d = row.doshCompletion;
+          if (!d) return `<span class="text-dim">—</span>`;
+          return `<span class="badge ${d.requiresAttention ? "warn" : "ok"}" style="font-size:11px;">${d.percent}%</span>`;
+        },
+      },
     ],
     searchFields: ["productName", "casNumber", "supplier", "manufacturer"],
     dropdownFilters: [
@@ -470,6 +479,7 @@ const CHEMICAL_MODULE = defineBusinessModule({
       { key: "currentSds", label: "Current SDS", predicate: (r) => r.sdsStatus === "Current" },
       { key: "expiringSoon", label: "Expiring Soon", predicate: (r) => r.sdsStatus === "Expiring Soon" },
       { key: "expiredSds", label: "Expired SDS", predicate: (r) => r.sdsStatus === "Expired" || r.sdsStatus === "Missing" },
+      { key: "requiresAttention", label: "Requires Attention", predicate: (r) => !!r.doshCompletion?.requiresAttention },
     ],
   },
 
@@ -532,12 +542,22 @@ const CHEMICAL_MODULE = defineBusinessModule({
   // reuses the sdsDocuments records the Overview/Reports tabs already
   // fetched (dashboardSubTabOrder includes "sdsDocuments"), no extra
   // request. tabKey jumps to the SDS tab, same as every other KPI card.
-  extraOverviewKpis: (dataByKey) => {
+  extraOverviewKpis: (dataByKey, masters) => {
     const F = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
     const expiredCount = (dataByKey.sdsDocuments || []).filter(
       (r) => r.fields[F.status] === "Current" && clientSdsExpiryStatus(r.fields[F.expiryDate]) === "Expired"
     ).length;
-    return [{ label: "Expired SDS", value: expiredCount, tone: expiredCount ? "bad" : "ok", tabKey: "sdsDocuments" }];
+    const completions = (masters || []).map((m) => clientChemicalCompletion(m, dataByKey));
+    const requiresAttentionCount = completions.filter((c) => c.requiresAttention).length;
+    return [
+      { label: "Expired SDS", value: expiredCount, tone: expiredCount ? "bad" : "ok", tabKey: "sdsDocuments" },
+      {
+        label: "DOSH Register Completion",
+        value: `${(masters || []).length - requiresAttentionCount}/${(masters || []).length}`,
+        tone: requiresAttentionCount ? "warn" : "ok",
+        navigate: `${CHEMICAL_MODULE.basePath}/register`,
+      },
+    ];
   },
 });
 
@@ -548,6 +568,53 @@ function clientSdsExpiryStatus(expiryDateStr) {
   if (!expiryDateStr) return null;
   const daysLeft = (new Date(expiryDateStr) - new Date()) / (1000 * 60 * 60 * 24);
   return daysLeft < 0 ? "Expired" : daysLeft <= 90 ? "Expiring Soon" : "Current";
+}
+
+// Mirrors the server's computeChemicalCompletion (server/lib/chemicalCompletion.js)
+// for the Module Dashboard's "DOSH Register Completion" KPI — cheap to
+// duplicate against data already fetched for this tab's other KPIs, same
+// reasoning as clientSdsExpiryStatus above. The Register list and Chemical
+// Profile page both get the authoritative version from the server instead.
+function clientChemicalCompletion(chem, dataByKey) {
+  const CF = MODULES.chemicals.fields;
+  const PF = CHEMICAL_MODULE.subTables.processUsage.fields;
+  const SDF = CHEMICAL_MODULE.subTables.sdsDocuments.fields;
+  const LF = CHEMICAL_MODULE.subTables.labelInspection.fields;
+  const hasSds = (dataByKey.sdsDocuments || []).some((r) => (r.fields[SDF.chemical] || []).includes(chem.id));
+  const hasLabel = (dataByKey.labelInspection || []).some((r) => (r.fields[LF.chemical] || []).includes(chem.id));
+  const usageRecords = (dataByKey.processUsage || []).filter((r) => (r.fields[PF.chemical] || []).includes(chem.id));
+  const usageContexts = usageRecords.length
+    ? usageRecords.map((u) => ({
+        quantity: u.fields[PF.quantity] || "",
+        workersExposed: u.fields[PF.workersExposed] ?? "",
+        controlMeasures: u.fields[PF.controlMeasures] || "",
+        ppeActuallyUsed: u.fields[PF.ppe] || "",
+        typeOfUse: u.fields[PF.typeOfUse] || "",
+      }))
+    : [
+        {
+          quantity: chem.fields[CF["Current Quantity"]] || "",
+          workersExposed: chem.fields[CF["No. of Workers Exposed"]] ?? "",
+          controlMeasures: chem.fields[CF["Control Measures"]] || "",
+          ppeActuallyUsed: chem.fields[CF["PPE Actually Used"]] || "",
+          typeOfUse: chem.fields[CF["Type of Use"]] || "",
+        },
+      ];
+  const usageComplete = usageContexts.some(
+    (u) => u.quantity && u.workersExposed !== "" && u.workersExposed != null && u.controlMeasures && u.ppeActuallyUsed && u.typeOfUse
+  );
+  const checks = [
+    !!chem.fields[CF["Product Name"]],
+    !!chem.fields[CF["CAS Number"]],
+    hasSds,
+    !!chem.fields[CF["Hazard Classification"]],
+    !!chem.fields[CF["Storage Location"]],
+    !!chem.fields[CF["Supplier"]],
+    usageComplete,
+    hasLabel,
+  ];
+  const complete = checks.filter(Boolean).length;
+  return { percent: Math.round((complete / checks.length) * 100), complete, total: checks.length, requiresAttention: complete < checks.length };
 }
 
 // Missing Value Rules (v2.0 brief): a derived/AI-sourced field that has no
@@ -573,6 +640,28 @@ function CHEMICAL_MODULE_renderGeneralInfoDerived(profile) {
   const cs = profile.complianceSummary || {};
   const gi = profile.generalInfo || {};
   const sds = gi.currentSds;
+  const dosh = profile.doshCompletion;
+
+  // DOSH register completion (v2.2) — see server/lib/chemicalCompletion.js
+  // for the mandatory-field definition. Points at the existing "Edit /
+  // Manage Files" button above rather than adding a second one, since it
+  // opens the same master-record edit form this checklist's fields live on.
+  const doshBlock = dosh
+    ? `
+    <div class="section-head"><h2 style="font-size:13px;">DOSH Register Completion</h2></div>
+    <div class="flex gap-8" style="align-items:center;margin:6px 0 8px;">
+      <span class="badge ${dosh.requiresAttention ? "warn" : "ok"}" style="font-size:12px;padding:4px 10px;">${dosh.percent}% complete (${dosh.complete}/${dosh.total})</span>
+      ${dosh.requiresAttention ? `<span class="badge bad" style="font-size:11px;">Requires Attention</span>` : ""}
+    </div>
+    ${
+      dosh.missingFields.length
+        ? `<ul style="margin:0 0 4px 18px;padding:0;font-size:12.5px;color:var(--muted-2);">
+            ${dosh.missingFields.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}
+          </ul>
+          <p class="text-dim" style="font-size:11.5px;margin-top:6px;">Use "Edit / Manage Files" above (or the Process Usage tab, for process-level fields) to complete these.</p>`
+        : `<p class="text-dim" style="font-size:12px;">Every mandatory DOSH register field is on file for this chemical.</p>`
+    }`
+    : "";
 
   const sdsBlock = `
     <div class="section-head"><h2 style="font-size:13px;">Current SDS</h2></div>
@@ -597,7 +686,7 @@ function CHEMICAL_MODULE_renderGeneralInfoDerived(profile) {
       <div class="field"><label>Next Review</label><div style="padding:8px 0;font-size:13.5px;">${cs.nextReview ? fmtDate(cs.nextReview) : "Not Available"}</div></div>
     </div>`;
 
-  return sdsBlock + complianceBlock;
+  return doshBlock + sdsBlock + complianceBlock;
 }
 
 // ---------------------------------------------------------------------

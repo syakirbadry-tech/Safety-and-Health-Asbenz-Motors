@@ -6,6 +6,7 @@ const { buildProfileRoute } = require("../lib/profileAggregation");
 const { extractSDSData } = require("../lib/extract");
 const { logActivity } = require("../lib/activity");
 const { getCompanyProfile } = require("../lib/companyProfile");
+const { computeChemicalCompletion, usageIsComplete } = require("../lib/chemicalCompletion");
 
 const router = buildModuleRouter({
   moduleName: "Chemicals",
@@ -199,6 +200,43 @@ function buildGeneralInfoDerived(subTables) {
   };
 }
 
+// DOSH completion badge/checklist (v2.2) — see server/lib/chemicalCompletion.js
+// for the mandatory-field definition shared with the Register list and
+// dashboard widgets below.
+function buildDoshCompletion(master, subTables) {
+  const CF = schema.chemicals.fields;
+  const PF = schema.chemicalProcessUsage.fields;
+  const usageRecords = subTables.processUsage || [];
+  const usageContexts = usageRecords.length
+    ? usageRecords.map((u) => ({
+        quantity: u.fields[PF.quantity] || "",
+        workersExposed: u.fields[PF.workersExposed] ?? "",
+        controlMeasures: u.fields[PF.controlMeasures] || "",
+        ppeActuallyUsed: u.fields[PF.ppe] || "",
+        typeOfUse: u.fields[PF.typeOfUse] || "",
+      }))
+    : [
+        {
+          quantity: master.fields[CF.quantity] || "",
+          workersExposed: master.fields[CF.workersExposed] ?? "",
+          controlMeasures: master.fields[CF.controlMeasures] || "",
+          ppeActuallyUsed: master.fields[CF.ppeActuallyUsed] || "",
+          typeOfUse: master.fields[CF.typeOfUse] || "",
+        },
+      ];
+
+  return computeChemicalCompletion({
+    productName: master.fields[CF.chemicalName],
+    casNumber: master.fields[CF.casNumber],
+    hasSds: (subTables.sdsDocuments || []).length > 0,
+    hazardClassification: master.fields[CF.hazardClassification],
+    storageLocation: master.fields[CF.storageLocation],
+    supplier: master.fields[CF.supplier],
+    hasCompleteUsage: usageContexts.some(usageIsComplete),
+    hasLabelInspection: (subTables.labelInspection || []).length > 0,
+  });
+}
+
 // GET /:id/profile — mirrors Machinery's aggregation endpoint (built from the
 // same generic framework), keyed by the sub-table names the frontend's
 // chemical.module.js config expects: exposureMonitoring, storageInspection,
@@ -228,6 +266,7 @@ router.get(
       result.complianceSummary = buildComplianceSummary(master, result.subTables);
       result.documents = buildDocumentsList(master, result.subTables);
       result.generalInfo = buildGeneralInfoDerived(result.subTables);
+      result.doshCompletion = buildDoshCompletion(master, result.subTables);
     },
   })
 );
@@ -247,11 +286,15 @@ router.get("/reports/register-data", async (req, res) => {
   try {
     const CF = schema.chemicals.fields;
     const SF = schema.sdsDocuments.fields;
+    const LF = schema.chemicalLabelInspection.fields;
+    const PF = schema.chemicalProcessUsage.fields;
 
-    const [company, chemicals, sdsDocs] = await Promise.all([
+    const [company, chemicals, sdsDocs, labelInspections, processUsageRecords] = await Promise.all([
       getCompanyProfile(),
       airtable.listRecords(schema.chemicals.tableId),
       airtable.listRecords(schema.sdsDocuments.tableId),
+      airtable.listRecords(schema.chemicalLabelInspection.tableId),
+      airtable.listRecords(schema.chemicalProcessUsage.tableId),
     ]);
 
     const sdsByChemical = {};
@@ -261,9 +304,49 @@ router.get("/reports/register-data", async (req, res) => {
         sdsByChemical[id].push(r);
       });
     });
+    const chemicalsWithLabelInspection = new Set();
+    labelInspections.forEach((r) => {
+      (r.fields[LF.chemical] || []).forEach((id) => chemicalsWithLabelInspection.add(id));
+    });
+    const usageByChemical = {};
+    processUsageRecords.forEach((r) => {
+      (r.fields[PF.chemical] || []).forEach((id) => {
+        if (!usageByChemical[id]) usageByChemical[id] = [];
+        usageByChemical[id].push(r);
+      });
+    });
 
     const rows = chemicals.map((r) => {
       const currentSds = pickCurrentSds(sdsByChemical[r.id]);
+      const usageRecords = usageByChemical[r.id] || [];
+      const usageContexts = usageRecords.length
+        ? usageRecords.map((u) => ({
+            quantity: u.fields[PF.quantity] || "",
+            workersExposed: u.fields[PF.workersExposed] ?? "",
+            controlMeasures: u.fields[PF.controlMeasures] || "",
+            ppeActuallyUsed: u.fields[PF.ppe] || "",
+            typeOfUse: u.fields[PF.typeOfUse] || "",
+          }))
+        : [
+            {
+              quantity: r.fields[CF.quantity] || "",
+              workersExposed: r.fields[CF.workersExposed] ?? "",
+              controlMeasures: r.fields[CF.controlMeasures] || "",
+              ppeActuallyUsed: r.fields[CF.ppeActuallyUsed] || "",
+              typeOfUse: r.fields[CF.typeOfUse] || "",
+            },
+          ];
+      const completion = computeChemicalCompletion({
+        productName: r.fields[CF.chemicalName],
+        casNumber: r.fields[CF.casNumber],
+        hasSds: (sdsByChemical[r.id] || []).length > 0,
+        hazardClassification: r.fields[CF.hazardClassification],
+        storageLocation: r.fields[CF.storageLocation],
+        supplier: r.fields[CF.supplier],
+        hasCompleteUsage: usageContexts.some(usageIsComplete),
+        hasLabelInspection: chemicalsWithLabelInspection.has(r.id),
+      });
+
       return {
         id: r.id,
         productName: r.fields[CF.chemicalName] || "",
@@ -276,13 +359,15 @@ router.get("/reports/register-data", async (req, res) => {
         physicalForm: currentSds?.fields[SF.physicalForm] || "",
         currentSdsId: currentSds?.id || null,
         sdsStatus: currentSds ? sdsExpiryStatus(currentSds.fields[SF.expiryDate]) : "Missing",
+        doshCompletion: completion,
       };
     });
 
     // `company` is additive (existing consumers — the Register page's
     // registerFilters and the Master-Detail Cockpit — only read `rows`) and
     // powers the Chemical Register print report's branding block.
-    res.json({ rows, company });
+    const requiresAttentionCount = rows.filter((r) => r.doshCompletion.requiresAttention).length;
+    res.json({ rows, company, doshCompletionSummary: { total: rows.length, requiresAttention: requiresAttentionCount, complete: rows.length - requiresAttentionCount } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Could not load chemical register data." });
