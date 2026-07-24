@@ -267,14 +267,24 @@ router.get("/reports/dosh-register-data", async (req, res) => {
     const SF = schema.sdsDocuments.fields;
     const LF = schema.chemicalLabelInspection.fields;
     const SUBF = schema.substances.fields;
+    const PF = schema.chemicalProcessUsage.fields;
 
-    const [companyProfile, chemicals, sdsDocs, labelInspections, substances] = await Promise.all([
+    const [companyProfile, chemicals, sdsDocs, labelInspections, substances, processUsageRecords] = await Promise.all([
       getCompanyProfile(),
       airtable.listRecords(schema.chemicals.tableId),
       airtable.listRecords(schema.sdsDocuments.tableId),
       airtable.listRecords(schema.chemicalLabelInspection.tableId),
       airtable.listRecords(schema.substances.tableId),
+      airtable.listRecords(schema.chemicalProcessUsage.tableId),
     ]);
+
+    const usageByChemical = {};
+    processUsageRecords.forEach((r) => {
+      (r.fields[PF.chemical] || []).forEach((id) => {
+        if (!usageByChemical[id]) usageByChemical[id] = [];
+        usageByChemical[id].push(r);
+      });
+    });
 
     const currentSdsChemicalIds = new Set();
     const sdsByChemical = {};
@@ -313,51 +323,83 @@ router.get("/reports/dosh-register-data", async (req, res) => {
       });
     });
 
+    // v2.2 — a chemical can now have zero, one, or many linked Chemical
+    // Process Usage records (see schema.js/DOSH_REGISTER_FIELD_MAPPING.md).
+    // Row unit becomes one row per (Process Usage × Substance): a chemical
+    // used in 2 processes with 3 substances emits 6 rows, each carrying that
+    // specific process's Quantity/Workers Exposed/Engineering Control/PPE/
+    // Type of Use instead of one chemical-wide value. A chemical with zero
+    // usage records (shouldn't happen after the one-time backfill, but stays
+    // correct for any chemical created outside the normal flow) falls back
+    // to its own flat fields exactly as before this change — nothing
+    // regresses mid-migration.
     const rows = [];
     chemicals.forEach((r) => {
       const latestSds = latestSdsFor(r.id);
-      const shared = {
+      const chemBase = {
         chemicalId: r.id,
         productName: r.fields[CF.chemicalName] || "", // display name "Product Name" — see schema.js comment
         physicalForm: latestSds?.fields[SF.physicalForm] || "",
-        storageLocation: r.fields[CF.storageLocation] || "",
-        department: r.fields[CF.department] || "",
-        process: r.fields[CF.process] || "",
-        quantity: r.fields[CF.quantity] || "",
-        workersExposed: r.fields[CF.workersExposed] ?? "",
-        controlMeasures: r.fields[CF.controlMeasures] || "",
-        ppeActuallyUsed: r.fields[CF.ppeActuallyUsed] || "",
-        typeOfUse: r.fields[CF.typeOfUse] || "",
-        typeCode: DOSH_TYPE_OF_USE_CODES[r.fields[CF.typeOfUse]] || "—",
         hazardClass: r.fields[CF.hazardClassification] || "NA",
         supplier: r.fields[CF.supplier] || "",
         csds: currentSdsChemicalIds.has(r.id) ? "Y" : "N",
         label: latestLabelByChemical[r.id] === "Yes" ? "Y" : latestLabelByChemical[r.id] === "No" ? "N" : "—",
       };
 
+      const usageRecords = usageByChemical[r.id] || [];
+      const usageContexts = usageRecords.length
+        ? usageRecords.map((u) => ({
+            process: u.fields[PF.process] || "",
+            storageLocation: u.fields[PF.location] || "",
+            quantity: u.fields[PF.quantity] || "",
+            workersExposed: u.fields[PF.workersExposed] ?? "",
+            controlMeasures: u.fields[PF.controlMeasures] || "",
+            ppeActuallyUsed: u.fields[PF.ppe] || "",
+            typeOfUse: u.fields[PF.typeOfUse] || "",
+          }))
+        : [
+            {
+              process: r.fields[CF.process] || "",
+              storageLocation: r.fields[CF.storageLocation] || "",
+              quantity: r.fields[CF.quantity] || "",
+              workersExposed: r.fields[CF.workersExposed] ?? "",
+              controlMeasures: r.fields[CF.controlMeasures] || "",
+              ppeActuallyUsed: r.fields[CF.ppeActuallyUsed] || "",
+              typeOfUse: r.fields[CF.typeOfUse] || "",
+            },
+          ];
+
       const subs = substancesByChemical[r.id] || [];
-      if (!subs.length) {
-        // No linked Substances yet — still emit one row so the chemical
-        // isn't silently missing from the register; fall back to the
-        // chemical's own CAS Number the way the pre-Substances report did.
-        rows.push({
-          ...shared,
-          chemicalName: "",
-          casNumber: r.fields[CF.casNumber] || "",
-          activeIngredients: "",
-        });
-      } else {
-        subs.forEach((s) => {
-          const concentration = s.fields[SUBF.concentration];
-          const name = s.fields[SUBF.chemicalName] || "";
+
+      usageContexts.forEach((usage) => {
+        const shared = {
+          ...chemBase,
+          ...usage,
+          typeCode: DOSH_TYPE_OF_USE_CODES[usage.typeOfUse] || "—",
+        };
+        if (!subs.length) {
+          // No linked Substances yet — still emit one row so the chemical
+          // isn't silently missing from the register; fall back to the
+          // chemical's own CAS Number the way the pre-Substances report did.
           rows.push({
             ...shared,
-            chemicalName: name,
-            casNumber: s.fields[SUBF.casNumber] || "",
-            activeIngredients: name ? `${name}${concentration ? ` (${concentration})` : ""}` : "",
+            chemicalName: "",
+            casNumber: r.fields[CF.casNumber] || "",
+            activeIngredients: "",
           });
-        });
-      }
+        } else {
+          subs.forEach((s) => {
+            const concentration = s.fields[SUBF.concentration];
+            const name = s.fields[SUBF.chemicalName] || "";
+            rows.push({
+              ...shared,
+              chemicalName: name,
+              casNumber: s.fields[SUBF.casNumber] || "",
+              activeIngredients: name ? `${name}${concentration ? ` (${concentration})` : ""}` : "",
+            });
+          });
+        }
+      });
     });
 
     res.json({
