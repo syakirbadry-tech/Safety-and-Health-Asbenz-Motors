@@ -217,6 +217,10 @@ function renderRegisterPage(config, isCurrent) {
 //   searchFields  -> row property keys included in the free-text search box
 //   dropdownFilters -> [{ key, label }] — options are the row's own distinct values
 //   quickFilters  -> [{ key, label, predicate(row) }], first entry is the default
+//   printReportPath -> optional route to a dedicated ReportEngine-based print/
+//                    export report (public/js/services/reportEngine.js) —
+//                    distinct from Export Excel/PDF above, which stay plain
+//                    CSV/bare-print exports of whatever's currently filtered.
 // ---------------------------------------------------------------------
 
 function renderFwRegisterFiltersPage(config, isCurrent) {
@@ -273,6 +277,7 @@ function renderFwRegisterFiltersPage(config, isCurrent) {
         ${isAdmin ? `<button type="button" class="btn primary small" id="fwAddBtn">+ ${escapeHtml(config.quickAddLabel)}</button>` : ""}
         <button type="button" class="btn small" id="fwExportExcelBtn">Export Excel</button>
         <button type="button" class="btn small" id="fwExportPdfBtn">Export PDF</button>
+        ${rf.printReportPath ? `<button type="button" class="btn small" data-navigate="${rf.printReportPath}">Print / Export Report</button>` : ""}
       </div>
     `;
 

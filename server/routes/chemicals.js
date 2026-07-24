@@ -5,6 +5,7 @@ const { buildModuleRouter } = require("../lib/moduleRouter");
 const { buildProfileRoute } = require("../lib/profileAggregation");
 const { extractSDSData } = require("../lib/extract");
 const { logActivity } = require("../lib/activity");
+const { getCompanyProfile } = require("../lib/companyProfile");
 
 const router = buildModuleRouter({
   moduleName: "Chemicals",
@@ -177,7 +178,8 @@ router.get("/reports/register-data", async (req, res) => {
     const CF = schema.chemicals.fields;
     const SF = schema.sdsDocuments.fields;
 
-    const [chemicals, sdsDocs] = await Promise.all([
+    const [company, chemicals, sdsDocs] = await Promise.all([
+      getCompanyProfile(),
       airtable.listRecords(schema.chemicals.tableId),
       airtable.listRecords(schema.sdsDocuments.tableId),
     ]);
@@ -207,7 +209,10 @@ router.get("/reports/register-data", async (req, res) => {
       };
     });
 
-    res.json({ rows });
+    // `company` is additive (existing consumers — the Register page's
+    // registerFilters and the Master-Detail Cockpit — only read `rows`) and
+    // powers the Chemical Register print report's branding block.
+    res.json({ rows, company });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Could not load chemical register data." });
@@ -260,18 +265,15 @@ router.get("/reports/dosh-register-data", async (req, res) => {
     const CF = schema.chemicals.fields;
     const SF = schema.sdsDocuments.fields;
     const LF = schema.chemicalLabelInspection.fields;
-    const CSF = schema.companySettings.fields;
     const SUBF = schema.substances.fields;
 
-    const [companyRecords, chemicals, sdsDocs, labelInspections, substances] = await Promise.all([
-      airtable.listRecords(schema.companySettings.tableId),
+    const [companyProfile, chemicals, sdsDocs, labelInspections, substances] = await Promise.all([
+      getCompanyProfile(),
       airtable.listRecords(schema.chemicals.tableId),
       airtable.listRecords(schema.sdsDocuments.tableId),
       airtable.listRecords(schema.chemicalLabelInspection.tableId),
       airtable.listRecords(schema.substances.tableId),
     ]);
-
-    const company = companyRecords[0] || null;
 
     const currentSdsChemicalIds = new Set();
     const sdsByChemical = {};
@@ -358,30 +360,30 @@ router.get("/reports/dosh-register-data", async (req, res) => {
     });
 
     res.json({
-      company: company
+      company: companyProfile
         ? {
-            id: company.id,
-            companyName: company.fields[CSF.companyName] || "",
+            id: companyProfile.id,
+            companyName: companyProfile.companyName,
             // Section A's single "Address" line = Company Profile's Address
             // Line 1 + Line 2 (the guideline's form has one address line;
             // the Company Profile module — v2.1 — splits it into two for a
             // more standard general-purpose address form).
-            address: [company.fields[CSF.address], company.fields[CSF.addressLine2]].filter(Boolean).join(", "),
-            city: company.fields[CSF.city] || "",
-            postcode: company.fields[CSF.postcode] || "",
-            state: company.fields[CSF.state] || "",
-            telephone: company.fields[CSF.telephone] || "",
-            email: company.fields[CSF.email] || "",
-            doshRegistrationNo: company.fields[CSF.doshRegistrationNo] || "",
-            codeOfSector: company.fields[CSF.codeOfSector] || "",
-            classOfIndustry: company.fields[CSF.classOfIndustry] || "",
-            companyActivity: company.fields[CSF.companyActivity] || [],
+            address: [companyProfile.address, companyProfile.addressLine2].filter(Boolean).join(", "),
+            city: companyProfile.city,
+            postcode: companyProfile.postcode,
+            state: companyProfile.state,
+            telephone: companyProfile.telephone,
+            email: companyProfile.email,
+            doshRegistrationNo: companyProfile.doshRegistrationNo,
+            codeOfSector: companyProfile.codeOfSector,
+            classOfIndustry: companyProfile.classOfIndustry,
+            companyActivity: companyProfile.companyActivity,
             // Report Defaults (Company Profile, v2.1) — pre-fill Section C,
             // still editable per generation, never forced.
-            defaultPreparedByName: company.fields[CSF.defaultPreparedByName] || "",
-            defaultPreparedByPosition: company.fields[CSF.defaultPreparedByPosition] || "",
-            defaultReviewedByName: company.fields[CSF.defaultReviewedByName] || "",
-            defaultReviewedByPosition: company.fields[CSF.defaultReviewedByPosition] || "",
+            defaultPreparedByName: companyProfile.defaultPreparedByName,
+            defaultPreparedByPosition: companyProfile.defaultPreparedByPosition,
+            defaultReviewedByName: companyProfile.defaultReviewedByName,
+            defaultReviewedByPosition: companyProfile.defaultReviewedByPosition,
           }
         : null,
       rows,

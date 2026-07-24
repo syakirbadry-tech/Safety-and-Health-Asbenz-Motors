@@ -399,6 +399,7 @@ const CHEMICAL_MODULE = defineBusinessModule({
   registerFilters: {
     dataEndpoint: "/chemicals/reports/register-data",
     rowsKey: "rows",
+    printReportPath: "/chemical/register-report",
     columns: [
       { key: "productName", label: "Product Name", strong: true },
       { key: "casNumber", label: "CAS Number", render: (row) => escapeHtml(naFallback(row.casNumber, "Not Available")) },
@@ -1268,4 +1269,149 @@ async function doshExportExcel(data) {
   ws.pageSetup.printArea = `A1:${String.fromCharCode(64 + cols.length)}${sigRow + 2}`;
 
   await ReportEngine.downloadWorkbook(wb, `dosh-chemical-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// ---------------------------------------------------------------------
+// Chemical Register — general print/export report (distinct from the DOSH
+// Chemical Register above, which reproduces an official government form).
+// Portrait, full corporate branding (logo/stamp — unlike DOSH, this report
+// has no "match the government form exactly" constraint), built entirely on
+// ReportEngine — the first non-DOSH report to use the shared engine. Reuses
+// the same /chemicals/reports/register-data endpoint the Register page's
+// on-screen filter/search table already fetches, now also returning
+// `company` (see server/routes/chemicals.js).
+// ---------------------------------------------------------------------
+const CHEMICAL_REGISTER_REPORT_VERSION = "v1.0";
+const CHEMICAL_REGISTER_ROWS_PER_PAGE = 20;
+const CHEMICAL_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF = 14;
+
+Router.register("/chemical/register-report", async (params, path, isCurrent) => {
+  const view = document.getElementById("view");
+  const isAdmin = Auth.user()?.role === "Admin";
+  view.innerHTML = `<div class="page-loading">Loading…</div>`;
+
+  let data;
+  try {
+    data = await api("/chemicals/reports/register-data");
+  } catch (err) {
+    if (!isCurrent()) return;
+    console.error(err);
+    view.innerHTML = Components.emptyState("Could not load the Chemical Register data.");
+    return;
+  }
+  if (!isCurrent()) return;
+
+  view.innerHTML = `
+    <div class="no-print">${Components.breadcrumb([
+      { label: "Dashboard", href: "/" },
+      { label: "Chemical Management", href: "/chemical" },
+      { label: "Chemical Register Report" },
+    ])}</div>
+    <div id="chemRegisterReport"></div>
+  `;
+  renderChemicalRegisterReport(data, isAdmin);
+});
+
+function renderChemicalRegisterReport(data, isAdmin) {
+  const rows = data.rows || [];
+  const pages = ReportEngine.paginate(rows, {
+    perPage: CHEMICAL_REGISTER_ROWS_PER_PAGE,
+    lastPageReserve: CHEMICAL_REGISTER_ROWS_LAST_PAGE_WITH_SIGNOFF,
+  });
+  const documentNumber = `CHEM-REG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+
+  const pagesHtml = pages
+    .map((pageRows, idx) => {
+      const showSignoff = idx === pages.length - 1;
+      return `
+    <section class="report-page">
+      ${idx === 0 ? `
+      <div class="report-title">CHEMICAL REGISTER</div>
+      ${ReportEngine.renderBranding(data.company, { showLogo: true, showStamp: true })}
+      ${ReportEngine.renderDocInfo({ documentNumber, reportVersion: CHEMICAL_REGISTER_REPORT_VERSION, generatedAt: new Date().toISOString() })}
+      ` : ""}
+      <table class="report-table report-table--compact">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>CAS No.</th>
+            <th>Storage Location</th>
+            <th>Hazard Classification</th>
+            <th>Supplier</th>
+            <th>Manufacturer</th>
+            <th>Physical Form</th>
+            <th>SDS Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pageRows
+            .map(
+              (r) => `
+            <tr>
+              <td>${escapeHtml(r.productName || "—")}</td>
+              <td>${escapeHtml(r.casNumber || "—")}</td>
+              <td>${escapeHtml(r.storageLocation || "—")}</td>
+              <td>${escapeHtml(r.hazardClassification || "Not Classified")}</td>
+              <td>${escapeHtml(r.supplier || "—")}</td>
+              <td>${escapeHtml(r.manufacturer || "—")}</td>
+              <td>${escapeHtml(r.physicalForm || "—")}</td>
+              <td>${escapeHtml(r.sdsStatus || "—")}</td>
+            </tr>`
+            )
+            .join("") || `<tr><td colspan="8" class="text-dim">No chemicals registered yet.</td></tr>`}
+        </tbody>
+      </table>
+      ${
+        showSignoff
+          ? `
+      <div class="report-section-head" style="margin-top:14px;">PREPARED / REVIEWED</div>
+      ${ReportEngine.renderSignatureBlock(
+        {
+          preparedByName: data.company?.defaultPreparedByName,
+          preparedByTitle: data.company?.defaultPreparedByPosition,
+          reviewedByName: data.company?.defaultReviewedByName,
+          reviewedByTitle: data.company?.defaultReviewedByPosition,
+        },
+        "chemReg"
+      )}`
+          : ""
+      }
+      ${ReportEngine.pageNumber(idx + 1, pages.length)}
+    </section>`;
+    })
+    .join("");
+
+  document.getElementById("chemRegisterReport").innerHTML = `
+    <div id="chemRegisterToolbar"></div>
+    ${pagesHtml}
+    <p class="text-dim no-print" style="font-size:11px;margin-top:20px;">Generated ${fmtDateTime(new Date().toISOString())} from live Asbenz Motors EHSMS data.</p>
+  `;
+
+  ReportEngine.mountToolbar(document.getElementById("chemRegisterToolbar"), {
+    editHref: isAdmin ? "/admin.html" : null,
+    onPrint: () => window.print(),
+    onExportExcel: () => chemicalRegisterExportExcel(data),
+  });
+}
+
+async function chemicalRegisterExportExcel(data) {
+  await ReportEngine.loadExcelJs().catch((err) => {
+    toast(err.message, true);
+    throw err;
+  });
+
+  const rows = data.rows || [];
+  const wb = new window.ExcelJS.Workbook();
+  const ws = ReportEngine.newWorksheet(wb, "Chemical Register", { orientation: "portrait" });
+
+  const cols = ["Product Name", "CAS No.", "Storage Location", "Hazard Classification", "Supplier", "Manufacturer", "Physical Form", "SDS Status"];
+  ws.columns = cols.map(() => ({ width: 20 }));
+  ReportEngine.excelHeaderRow(ws, 1, cols, { freeze: true, repeat: true });
+  rows.forEach((r, idx) => {
+    ReportEngine.excelDataRow(ws, idx + 2, [
+      r.productName, r.casNumber, r.storageLocation, r.hazardClassification, r.supplier, r.manufacturer, r.physicalForm, r.sdsStatus,
+    ]);
+  });
+
+  await ReportEngine.downloadWorkbook(wb, `chemical-register-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
