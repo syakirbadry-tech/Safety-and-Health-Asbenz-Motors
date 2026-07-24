@@ -1044,7 +1044,10 @@ function renderWizardDuplicateBanner(match) {
   document.getElementById("wizardDupeUpdateBtn").addEventListener("click", () => {
     wizardUpdateExistingId = match.id;
     container.innerHTML = `<p class="text-dim" style="font-size:12px;margin-bottom:14px;">Saving will update <strong>${escapeHtml(match.productName || "the existing chemical")}</strong> instead of creating a new one, and add this SDS as a new revision. <button type="button" class="btn ghost small" id="wizardDupeUndoBtn" style="margin-left:8px;">Undo</button></p>`;
-    document.getElementById("wizardDupeUndoBtn").addEventListener("click", () => renderWizardDuplicateBanner(match));
+    document.getElementById("wizardDupeUndoBtn").addEventListener("click", () => {
+      wizardUpdateExistingId = null;
+      renderWizardDuplicateBanner(match);
+    });
   });
   document.getElementById("wizardDupeCreateBtn").addEventListener("click", () => {
     wizardUpdateExistingId = null;
