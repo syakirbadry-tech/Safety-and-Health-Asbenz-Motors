@@ -556,6 +556,21 @@ router.get("/reports/dosh-register-data", async (req, res) => {
       });
     });
 
+    // Optional scoping for "Print by Process" (Chemical Register's Process
+    // quick-filter) and "Print This Chemical" (Chemical Profile page) — both
+    // reuse this same endpoint/template rather than a separate report, since
+    // every row already carries chemicalId and process. Unscoped (neither
+    // query param set) behaves exactly as before this addition.
+    let scopedRows = rows;
+    if (req.query.chemicalId) {
+      scopedRows = scopedRows.filter((r) => r.chemicalId === req.query.chemicalId);
+    }
+    if (req.query.process) {
+      const wantedProcess = String(req.query.process).trim().toLowerCase();
+      scopedRows = scopedRows.filter((r) => String(r.process || "").trim().toLowerCase() === wantedProcess);
+    }
+    const scopedChemicalCount = new Set(scopedRows.map((r) => r.chemicalId)).size;
+
     res.json({
       company: companyProfile
         ? {
@@ -583,8 +598,9 @@ router.get("/reports/dosh-register-data", async (req, res) => {
             defaultReviewedByPosition: companyProfile.defaultReviewedByPosition,
           }
         : null,
-      rows,
-      chemicalCount: chemicals.length,
+      rows: scopedRows,
+      chemicalCount: scopedChemicalCount,
+      allProcesses: Array.from(new Set(rows.map((r) => r.process).filter(Boolean))).sort(),
     });
   } catch (err) {
     console.error(err);

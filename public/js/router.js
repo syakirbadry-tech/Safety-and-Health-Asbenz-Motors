@@ -68,10 +68,20 @@ const Router = (() => {
     });
   }
 
+  // `path` may include a query string ("/chemical/dosh-register?process=X")
+  // for the handful of report routes that accept an optional scope (see
+  // /chemical/dosh-register's process/chemicalId params) — matching is
+  // always done on the pathname alone; a route's render function receives
+  // the pathname as `path` exactly as before (query-string support is
+  // additive, existing callbacks are unaffected) plus a new 4th `search`
+  // argument (the raw "?..." string, or "" when there is none).
   async function render(path) {
     if (!viewEl) viewEl = document.getElementById("view");
-    const found = match(path);
-    highlightNav(path);
+    const qIndex = path.indexOf("?");
+    const pathname = qIndex === -1 ? path : path.slice(0, qIndex);
+    const search = qIndex === -1 ? "" : path.slice(qIndex);
+    const found = match(pathname);
+    highlightNav(pathname);
     window.scrollTo(0, 0);
 
     const myGeneration = ++navGeneration;
@@ -83,7 +93,7 @@ const Router = (() => {
     }
     viewEl.innerHTML = `<div class="page-loading">Loading…</div>`;
     try {
-      await found.route.render(found.params, path, isCurrent);
+      await found.route.render(found.params, pathname, isCurrent, search);
     } catch (err) {
       if (!isCurrent()) return; // a newer navigation already took over #view
       console.error("[router] render failed:", err);
@@ -92,7 +102,7 @@ const Router = (() => {
   }
 
   function navigate(path, { replace = false } = {}) {
-    if (location.pathname === path) return render(path);
+    if (location.pathname + location.search === path) return render(path);
     if (replace) history.replaceState({}, "", path);
     else history.pushState({}, "", path);
     render(path);
@@ -105,8 +115,8 @@ const Router = (() => {
       e.preventDefault();
       navigate(navEl.dataset.navigate);
     });
-    window.addEventListener("popstate", () => render(location.pathname));
-    render(location.pathname);
+    window.addEventListener("popstate", () => render(location.pathname + location.search));
+    render(location.pathname + location.search);
   }
 
   return { register, navigate, start };

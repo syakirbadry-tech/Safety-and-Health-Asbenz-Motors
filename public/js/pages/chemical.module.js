@@ -649,9 +649,10 @@ function CHEMICAL_MODULE_renderGeneralInfoDerived(profile) {
   const doshBlock = dosh
     ? `
     <div class="section-head"><h2 style="font-size:13px;">DOSH Register Completion</h2></div>
-    <div class="flex gap-8" style="align-items:center;margin:6px 0 8px;">
+    <div class="flex gap-8" style="align-items:center;margin:6px 0 8px;flex-wrap:wrap;">
       <span class="badge ${dosh.requiresAttention ? "warn" : "ok"}" style="font-size:12px;padding:4px 10px;">${dosh.percent}% complete (${dosh.complete}/${dosh.total})</span>
       ${dosh.requiresAttention ? `<span class="badge bad" style="font-size:11px;">Requires Attention</span>` : ""}
+      <a class="btn small ghost" data-navigate="/chemical/dosh-register?chemicalId=${profile.master.id}">Print DOSH Entry</a>
     </div>
     ${
       dosh.missingFields.length
@@ -1197,14 +1198,20 @@ const DOSH_ROWS_PER_PAGE = 8;
 const DOSH_ROWS_LAST_PAGE_WITH_C = 5;
 const DOSH_REPORT_VERSION = "v2.1";
 
-Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
+// Accepts an optional ?process=<name> or ?chemicalId=<id> query string —
+// "Print by Process" (Register page quick-filter) and "Print This Chemical"
+// (Chemical Profile page) both link here instead of a separate report,
+// since /chemicals/reports/dosh-register-data already supports the same
+// scoping server-side. Unscoped (plain /chemical/dosh-register) is
+// unchanged from before this addition.
+Router.register("/chemical/dosh-register", async (params, path, isCurrent, search) => {
   const view = document.getElementById("view");
   const isAdmin = Auth.user()?.role === "Admin";
   view.innerHTML = `<div class="page-loading">Loading…</div>`;
 
   let data;
   try {
-    data = await api("/chemicals/reports/dosh-register-data");
+    data = await api(`/chemicals/reports/dosh-register-data${search || ""}`);
   } catch (err) {
     if (!isCurrent()) return;
     console.error(err);
@@ -1213,14 +1220,49 @@ Router.register("/chemical/dosh-register", async (params, path, isCurrent) => {
   }
   if (!isCurrent()) return;
 
+  const scopeParams = new URLSearchParams(search || "");
+  const scopeLabel = scopeParams.get("chemicalId")
+    ? data.rows[0]?.productName
+      ? `Scoped to "${data.rows[0].productName}"`
+      : "Scoped to one chemical"
+    : scopeParams.get("process")
+      ? `Scoped to process "${scopeParams.get("process")}"`
+      : "";
+
+  const processOptions = Array.isArray(data.allProcesses) ? data.allProcesses : [];
+
   view.innerHTML = `
     <div class="no-print">${Components.breadcrumb([
       { label: "Dashboard", href: "/" },
       { label: "Chemical Management", href: "/chemical" },
       { label: "DOSH Chemical Register" },
     ])}</div>
+    ${
+      scopeLabel
+        ? `<div class="no-print flex gap-8" style="align-items:center;margin-bottom:10px;">
+            <span class="badge neutral">${escapeHtml(scopeLabel)}</span>
+            <a class="btn small ghost" data-navigate="/chemical/dosh-register">Show Full Register</a>
+          </div>`
+        : processOptions.length
+          ? `<div class="no-print flex gap-8" style="align-items:center;margin-bottom:10px;">
+              <label for="doshProcessFilter" style="font-size:12.5px;">Print by Process:</label>
+              <select id="doshProcessFilter" style="max-width:220px;">
+                <option value="">— Select a process —</option>
+                ${processOptions.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("")}
+              </select>
+            </div>`
+          : ""
+    }
     <div id="doshReport"></div>
   `;
+
+  const processFilterEl = document.getElementById("doshProcessFilter");
+  if (processFilterEl) {
+    processFilterEl.addEventListener("change", () => {
+      if (processFilterEl.value) Router.navigate(`/chemical/dosh-register?process=${encodeURIComponent(processFilterEl.value)}`);
+    });
+  }
+
   renderDoshReport(data, isAdmin);
 });
 
