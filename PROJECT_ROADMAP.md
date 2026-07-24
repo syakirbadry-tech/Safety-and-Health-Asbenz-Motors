@@ -45,6 +45,8 @@ Milestones:
 
 3f. **Company Profile module — done.** Promoted `Company Settings` from a DOSH-register-only table into a platform-wide, reusable single source of truth for company information, edited via a new Admin panel tab rather than the DOSH register's own inline form (removed). 11 new additive fields (Company Registration Number, MSIC Code, Address Line 2, Country, Website, Logo, Stamp, Report Defaults). No new table, no new API route. See ARCHITECTURE.md §5.5, DATABASE.md §3.10.
 
+3g. **Reusable Print/Export Engine — done.** Generalized the DOSH Chemical Register's bespoke print/export code into a shared engine (`public/js/services/reportEngine.js` + `.report-*` CSS design system) and rolled it out to five more reports: Chemical Register, Machinery Register, CAPA Register, OSH Committee Register, and Company Profile — each with its own `GET /reports/*-data` aggregation endpoint, full corporate branding from Company Profile, page numbering, and (except Company Profile) a Prepared By/Reviewed By sign-off block. No new PDF dependency (browser-native print, same as DOSH); Excel export via the same lazy-loaded ExcelJS pattern. See ARCHITECTURE.md §5.6, PRINT_EXPORT_IMPLEMENTATION_REPORT.md.
+
 4. **Noise Management module.** Noise Monitoring, Noise Mapping, Engineering Controls, Audiometric Tests, Employee Exposure tables; reuses HRA (filtered) and the shared Calibration Records table from Milestone 1. Expected to be a config file on the existing framework.
 5. **Operational Safety module** (merges High Risk + SOP). Generalized Permit To Work table, new Contractors and Safety Inspections tables; reuses SOP's `Document Type` field (already added for Milestone 3) for a Work Instructions tab. Expected to be a config file on the existing framework.
 
